@@ -1,9 +1,11 @@
 [package]
 name = "beatsaver-rs"
 version = "0.1.0"
+description = "A Rust library for interacting with the beatsaver.com api"
 authors = ["qwerty01 <qw3rty01@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
+repository = "https://github.com/qwerty01/beatsaver-rs"
 
 [dependencies]
 surf = "2.1.0"

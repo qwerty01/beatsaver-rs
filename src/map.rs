@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::BeatSaverUser;
 
@@ -10,7 +10,7 @@ pub struct MapDifficulties {
     pub hard: bool,
     pub expert: bool,
     #[serde(alias = "expertPlus")]
-    pub expert_plus: bool
+    pub expert_plus: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ pub struct MapDifficltyCharacteristic {
     pub njs_offset: i64,
     pub bombs: usize,
     pub notes: usize,
-    pub obstacles: usize
+    pub obstacles: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -32,13 +32,13 @@ pub struct MapDifficultyCharacteristics {
     pub hard: Option<MapDifficltyCharacteristic>,
     pub expert: Option<MapDifficltyCharacteristic>,
     #[serde(alias = "expertPlus")]
-    pub expert_plus: Option<MapDifficltyCharacteristic>
+    pub expert_plus: Option<MapDifficltyCharacteristic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapCharacteristics {
     pub difficulties: MapDifficultyCharacteristics,
-    pub name: String
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,7 +55,7 @@ pub struct MapMetadata {
     pub song_name: String,
     #[serde(alias = "songSubName")]
     pub song_sub_name: String,
-    pub bpm: usize
+    pub bpm: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -67,7 +67,7 @@ pub struct MapStats {
     #[serde(alias = "upVotes")]
     pub upvotes: usize,
     pub heat: f32,
-    pub rating: f32
+    pub rating: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -87,15 +87,15 @@ pub struct Map {
     #[serde(alias = "downloadURL")]
     pub download: String,
     #[serde(alias = "coverURL")]
-    pub cover: String
+    pub cover: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-    use chrono::DateTime;
     use crate::map::Map;
-    
+    use chrono::DateTime;
+    use serde_json;
+
     #[test]
     fn test_map() {
         let data = r#"
@@ -258,10 +258,19 @@ mod tests {
         assert_eq!(v.name, "Shut Up and Dance - WALK THE MOON");
         assert_eq!(v.uploader.id, "5cff0b7298cc5a672c84e98d");
         assert_eq!(v.uploader.username, "bennydabeast");
-        assert_eq!(v.uploaded, DateTime::parse_from_rfc3339("2018-11-21T01:27:00.000Z").unwrap());
+        assert_eq!(
+            v.uploaded,
+            DateTime::parse_from_rfc3339("2018-11-21T01:27:00.000Z").unwrap()
+        );
         assert_eq!(v.hash, "89cf8bb07afb3c59ae7b5ac00337d62261c36fb4");
-        assert_eq!(v.direct_download, "/cdn/2144/89cf8bb07afb3c59ae7b5ac00337d62261c36fb4.zip");
+        assert_eq!(
+            v.direct_download,
+            "/cdn/2144/89cf8bb07afb3c59ae7b5ac00337d62261c36fb4.zip"
+        );
         assert_eq!(v.download, "/api/download/key/2144");
-        assert_eq!(v.cover, "/cdn/2144/89cf8bb07afb3c59ae7b5ac00337d62261c36fb4.png");
+        assert_eq!(
+            v.cover,
+            "/cdn/2144/89cf8bb07afb3c59ae7b5ac00337d62261c36fb4.png"
+        );
     }
 }

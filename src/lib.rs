@@ -6,7 +6,7 @@ pub mod map;
 pub struct BeatSaverUser {
     #[serde(alias = "_id")]
     pub id: String,
-    pub username: String
+    pub username: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -19,13 +19,13 @@ pub struct Page<T: Serialize> {
     #[serde(alias = "prevPage")]
     pub prev_page: Option<usize>,
     #[serde(alias = "nextPage")]
-    pub next_page: Option<usize>
+    pub next_page: Option<usize>,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::Page;
     use crate::map::Map;
+    use crate::Page;
 
     #[test]
     fn test_pages() {
