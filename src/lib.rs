@@ -1,25 +1,25 @@
 use serde::{Deserialize, Serialize};
 
-mod map;
+pub mod map;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct BeatSaverUser {
+pub struct BeatSaverUser {
     #[serde(alias = "_id")]
-    id: String,
-    username: String
+    pub id: String,
+    pub username: String
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct Page<T: Serialize> {
-    docs: Vec<T>,
+pub struct Page<T: Serialize> {
+    pub docs: Vec<T>,
     #[serde(alias = "totalDocs")]
-    total_docs: usize,
+    pub total_docs: usize,
     #[serde(alias = "lastPage")]
-    last_page: usize,
+    pub last_page: usize,
     #[serde(alias = "prevPage")]
-    prev_page: Option<usize>,
+    pub prev_page: Option<usize>,
     #[serde(alias = "nextPage")]
-    next_page: Option<usize>
+    pub next_page: Option<usize>
 }
 
 #[cfg(test)]

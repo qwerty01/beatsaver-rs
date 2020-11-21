@@ -5,89 +5,89 @@ use crate::BeatSaverUser;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapDifficulties {
-    easy: bool,
-    normal: bool,
-    hard: bool,
-    expert: bool,
+    pub easy: bool,
+    pub normal: bool,
+    pub hard: bool,
+    pub expert: bool,
     #[serde(alias = "expertPlus")]
-    expert_plus: bool
+    pub expert_plus: bool
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapDifficltyCharacteristic {
-    duration: f32,
-    length: usize,
-    njs: usize,
+    pub duration: f32,
+    pub length: usize,
+    pub njs: usize,
     #[serde(alias = "njsOffset")]
-    njs_offset: i64,
-    bombs: usize,
-    notes: usize,
-    obstacles: usize
+    pub njs_offset: i64,
+    pub bombs: usize,
+    pub notes: usize,
+    pub obstacles: usize
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapDifficultyCharacteristics {
-    easy: Option<MapDifficltyCharacteristic>,
-    normal: Option<MapDifficltyCharacteristic>,
-    hard: Option<MapDifficltyCharacteristic>,
-    expert: Option<MapDifficltyCharacteristic>,
+    pub easy: Option<MapDifficltyCharacteristic>,
+    pub normal: Option<MapDifficltyCharacteristic>,
+    pub hard: Option<MapDifficltyCharacteristic>,
+    pub expert: Option<MapDifficltyCharacteristic>,
     #[serde(alias = "expertPlus")]
-    expert_plus: Option<MapDifficltyCharacteristic>
+    pub expert_plus: Option<MapDifficltyCharacteristic>
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapCharacteristics {
-    difficulties: MapDifficultyCharacteristics,
-    name: String
+    pub difficulties: MapDifficultyCharacteristics,
+    pub name: String
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapMetadata {
-    difficulties: MapDifficulties,
-    duration: usize,
-    automapper: Option<String>,
-    characteristics: Vec<MapCharacteristics>,
+    pub difficulties: MapDifficulties,
+    pub duration: usize,
+    pub automapper: Option<String>,
+    pub characteristics: Vec<MapCharacteristics>,
     #[serde(alias = "levelAuthorName")]
-    level_author: String,
+    pub level_author: String,
     #[serde(alias = "songAuthorName")]
-    song_author: String,
+    pub song_author: String,
     #[serde(alias = "songName")]
-    song_name: String,
+    pub song_name: String,
     #[serde(alias = "songSubName")]
-    song_sub_name: String,
-    bpm: usize
+    pub song_sub_name: String,
+    pub bpm: usize
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapStats {
-    downloads: usize,
-    plays: usize,
+    pub downloads: usize,
+    pub plays: usize,
     #[serde(alias = "downVotes")]
-    downvotes: usize,
+    pub downvotes: usize,
     #[serde(alias = "upVotes")]
-    upvotes: usize,
-    heat: f32,
-    rating: f32
+    pub upvotes: usize,
+    pub heat: f32,
+    pub rating: f32
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Map {
-    metadata: MapMetadata,
-    stats: MapStats,
-    description: String,
+    pub metadata: MapMetadata,
+    pub stats: MapStats,
+    pub description: String,
     #[serde(alias = "_id")]
-    id: String,
-    key: String,
-    name: String,
-    uploader: BeatSaverUser,
-    hash: String,
-    uploaded: DateTime<Utc>,
+    pub id: String,
+    pub key: String,
+    pub name: String,
+    pub uploader: BeatSaverUser,
+    pub hash: String,
+    pub uploaded: DateTime<Utc>,
     #[serde(alias = "directDownload")]
-    direct_download: String,
+    pub direct_download: String,
     #[serde(alias = "downloadURL")]
-    download: String,
+    pub download: String,
     #[serde(alias = "coverURL")]
-    cover: String
+    pub cover: String
 }
 
 #[cfg(test)]
