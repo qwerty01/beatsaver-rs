@@ -1,6 +1,24 @@
+use async_trait::async_trait;
+use hex::{self, FromHexError};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_json;
+#[cfg(feature = "async-std_runtime")]
+use surf::{self, Client};
+#[cfg(feature = "tokio_runtime")]
+use reqwest::{self, Client};
+use std::convert::{From, TryFrom, TryInto};
+use std::error::Error;
+use std::fmt;
+use std::num::ParseIntError;
+use url::Url;
+use map::Map;
 
 pub mod map;
+
+lazy_static! {
+    static ref BEATSAVER_API: Url = Url::parse("https://beatsaver.com/api/").unwrap();
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeatSaverUser {
@@ -22,10 +40,192 @@ pub struct Page<T: Serialize> {
     pub next_page: Option<usize>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum MapIdError {
+    InvalidHash,
+    ParseIntError(ParseIntError),
+}
+impl fmt::Display for MapIdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::InvalidHash => write!(f, "Specified hash is invalid"),
+            Self::ParseIntError(e) => e.fmt(f),
+        }
+    }
+}
+impl Error for MapIdError {}
+impl From<ParseIntError> for MapIdError {
+    fn from(e: ParseIntError) -> Self {
+        Self::ParseIntError(e)
+    }
+}
+impl From<FromHexError> for MapIdError {
+    fn from(_: FromHexError) -> Self {
+        Self::InvalidHash
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MapId {
+    Key(usize),
+    Hash(String),
+}
+impl TryFrom<String> for MapId {
+    type Error = MapIdError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.len() {
+            40 => {
+                hex::decode(&s)?;
+                Ok(Self::Hash(s))
+            }
+            _ => Ok(Self::Key(usize::from_str_radix(s.as_str(), 16)?)),
+        }
+    }
+}
+impl TryFrom<&str> for MapId {
+    type Error = MapIdError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        s.to_string().try_into()
+    }
+}
+
+#[cfg(feature = "async-std_runtime")]
+#[derive(Debug)]
+pub enum BeatSyncApiError {
+    RequestError(surf::Error),
+    SerializeError(serde_json::Error),
+}
+#[cfg(feature = "tokio_runtime")]
+#[derive(Debug)]
+pub enum BeatSyncApiError {
+    RequestError(reqwest::Error),
+    SerializeError(serde_json::Error),
+}
+impl fmt::Display for BeatSyncApiError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::RequestError(e) => e.fmt(f),
+            Self::SerializeError(e) => e.fmt(f),
+        }
+    }
+}
+impl Error for BeatSyncApiError {}
+#[cfg(feature = "async-std_runtime")]
+impl From<surf::Error> for BeatSyncApiError {
+    fn from(e: surf::Error) -> Self{
+        Self::RequestError(e)
+    }
+}
+#[cfg(feature = "tokio_runtime")]
+impl From<reqwest::Error> for BeatSyncApiError {
+    fn from(e: reqwest::Error) -> Self{
+        Self::RequestError(e)
+    }
+}
+impl From<serde_json::Error> for BeatSyncApiError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::SerializeError(e)
+    }
+}
+
+#[async_trait]
+pub trait BeatSyncApi {
+    #[cfg(feature = "async-std_runtime")]
+    async fn request(&self, url: Url) -> Result<String, surf::Error>;
+    #[cfg(feature = "tokio_runtime")]
+    async fn request(&self, url: Url) -> Result<String, reqwest::Error>;
+    async fn map(&self, id: &MapId) -> Result<Map, BeatSyncApiError> {
+        let data = match id {
+            MapId::Key(k) => {
+                self.request(
+                    BEATSAVER_API
+                        .join(format!("maps/detail/{:x}", k).as_str())
+                        .unwrap(),
+                )
+                .await?
+            }
+            MapId::Hash(h) => {
+                self.request(
+                    BEATSAVER_API
+                        .join(format!("maps/by-hash/{}", h).as_str())
+                        .unwrap(),
+                )
+                .await?
+            }
+        };
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_by(&self, user: &BeatSaverUser) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join(format!("maps/uploader/{}", user.id).as_str()).unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_hot(&self) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join("maps/hot").unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_rating(&self) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join("maps/rating").unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_latest(&self) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join("maps/latest").unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_downloads(&self) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join("maps/downloads").unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+    async fn maps_plays(&self) -> Result<Page<Map>, BeatSyncApiError> {
+        let data = self.request(BEATSAVER_API.join("maps/plays").unwrap()).await?;
+
+        Ok(serde_json::from_str(data.as_str())?)
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct BeatSync {
+    client: Client,
+}
+
+#[cfg(feature = "async-std_runtime")]
+#[async_trait]
+impl BeatSyncApi for BeatSync {
+    async fn request(&self, url: Url) -> Result<String, surf::Error> {
+        self.client.get(url).recv_string().await
+    }
+}
+#[cfg(feature = "tokio_runtime")]
+#[async_trait]
+impl BeatSyncApi for BeatSync {
+    async fn request(&self, url: Url) -> Result<String, reqwest::Error> {
+        self.client.get(url).send().await?.text().await
+    }
+}
+
+impl BeatSync {
+    pub fn new(client: Client) -> Self {
+        Self { client }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::{BeatSync, BeatSyncApi, Page};
     use crate::map::Map;
-    use crate::Page;
+    #[cfg(feature = "async-std_runtime")]
+    use surf::Client;
+    #[cfg(feature = "tokio_runtime")]
+    use reqwest::Client;
+    use std::convert::TryInto;
 
     #[test]
     fn test_pages() {
@@ -38,5 +238,21 @@ mod tests {
         assert_eq!(page.last_page, 3536);
         assert_eq!(page.prev_page, None);
         assert_eq!(page.next_page, Some(1));
+    }
+    #[cfg(feature = "async-std_runtime")]
+    #[async_std::test]
+    async fn test_map() {
+        let client = BeatSync::new(Client::new());
+        let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
+
+        assert_eq!(map.id, "2144");
+    }
+    #[cfg(feature = "tokio_runtime")]
+    #[tokio::test]
+    async fn test_map() {
+        let client = BeatSync::new(Client::new());
+        let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
+
+        assert_eq!(map.id, "2144");
     }
 }

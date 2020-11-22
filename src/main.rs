@@ -1,13 +1,12 @@
 use beatsaver_rs::{map::Map, Page};
 use serde_json;
 use std::error::Error;
-use surf;
+use reqwest;
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let data = surf::get("https://beatsaver.com/api/maps/rating")
-        .recv_string()
-        .await?;
+    let data = reqwest::get("https://beatsaver.com/api/maps/rating")
+        .await?.text().await?;
 
     let page: Page<Map> = serde_json::from_str(data.as_str())?;
 
