@@ -211,8 +211,21 @@ impl BeatSyncApi for BeatSync {
     }
 }
 
+#[cfg(feature = "async-std_runtime")]
 impl BeatSync {
-    pub fn new(client: Client) -> Self {
+    // TODO: Allow user to specify client
+    // TODO: Set user agent
+    pub fn new() -> Self {
+        let client = Client::new();
+        Self { client }
+    }
+}
+
+#[cfg(feature = "tokio_runtime")]
+impl BeatSync {
+    // TODO: Allow user to specify client
+    pub fn new() -> Self {
+        let client = Client::builder().user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))).build().unwrap();
         Self { client }
     }
 }
@@ -221,10 +234,6 @@ impl BeatSync {
 mod tests {
     use crate::{BeatSync, BeatSyncApi, Page};
     use crate::map::Map;
-    #[cfg(feature = "async-std_runtime")]
-    use surf::Client;
-    #[cfg(feature = "tokio_runtime")]
-    use reqwest::Client;
     use std::convert::TryInto;
 
     #[test]
@@ -239,20 +248,21 @@ mod tests {
         assert_eq!(page.prev_page, None);
         assert_eq!(page.next_page, Some(1));
     }
+
     #[cfg(feature = "async-std_runtime")]
     #[async_std::test]
     async fn test_map() {
-        let client = BeatSync::new(Client::new());
+        let client = BeatSync::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 
-        assert_eq!(map.id, "2144");
+        assert_eq!(map.key, "2144");
     }
     #[cfg(feature = "tokio_runtime")]
     #[tokio::test]
     async fn test_map() {
-        let client = BeatSync::new(Client::new());
+        let client = BeatSync::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 
-        assert_eq!(map.id, "2144");
+        assert_eq!(map.key, "2144");
     }
 }
