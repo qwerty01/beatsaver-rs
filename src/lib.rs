@@ -251,7 +251,7 @@ mod tests {
 
     #[cfg(feature = "async-std_runtime")]
     #[async_std::test]
-    async fn test_map() {
+    async fn test_async_std_map() {
         let client = BeatSync::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 
@@ -259,7 +259,7 @@ mod tests {
     }
     #[cfg(feature = "tokio_runtime")]
     #[tokio::test]
-    async fn test_map() {
+    async fn test_tokio_map() {
         let client = BeatSync::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 

@@ -8,7 +8,7 @@ license-file = "LICENSE"
 repository = "https://github.com/qwerty01/beatsaver-rs"
 
 [features]
-default = ["async-std_runtime"]
+default = ["tokio_runtime"]
 async-std_runtime = ["async-std", "surf", "async-trait"]
 tokio_runtime = ["tokio", "reqwest", "async-trait"]
 hash = ["sha2"]
