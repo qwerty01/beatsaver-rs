@@ -12,9 +12,16 @@ cargo install beatsaver-rs
 
 API has not been stabalized yet.
 
-## Async Runtimes
+## Backends
 
-Currently, this crate supports two async backends: [`reqwest`](https://crates.io/crates/reqwest) which runs on [`tokio`](https://crates.io/crates/tokio) and [`surf`](https://crates.io/crates/surf) which runs on [`async-std`](https://crates.io/crates/async-std). By default, [`reqwest`](https://crates.io/crates/reqwest) is used, but you can specify a particular backend by enabling the `[backend]_backend` feature (for example, `surf_backend`).
+Currently, this crate supports three backends:
+* [`reqwest`](https://crates.io/crates/reqwest), which is asynchronous and runs on [`tokio`](https://crates.io/crates/tokio)
+* [`surf`](https://crates.io/crates/surf), which is asynchronous and runs on [`async-std`](https://crates.io/crates/async-std)
+* [`ureq`](https://crates.io/crates/ureq), which is synchronous.
+
+By default, [`reqwest`](https://crates.io/crates/reqwest) is used, but you can specify a particular backend by enabling the `[backend]_backend` feature (for example, `surf_backend`).
+
+## Testing
 
 When testing, make sure to enable all features to ensure all backends are tested properly:
 
