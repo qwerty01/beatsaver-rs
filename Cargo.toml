@@ -7,9 +7,28 @@ edition = "2018"
 license-file = "LICENSE"
 repository = "https://github.com/qwerty01/beatsaver-rs"
 
+[features]
+default = ["reqwest_backend"]
+async = ["async-trait"]
+sync = []
+surf_backend = ["async-std", "surf", "async"]
+reqwest_backend = ["tokio", "reqwest", "async"]
+ureq_backend = ["sync", "ureq"]
+hash = ["sha2"]
+
 [dependencies]
-surf = "2.1.0"
-async-std = { version = "1.7.0", features = ["attributes"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-chrono = { version = "0.4.19", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+url = "2.2"
+lazy_static = "1.4"
+urlencoding = "1.1"
+bytes = "0.5"
+surf = { version = "2.1", optional = true }
+async-std = { version = "1.7", features = ["attributes"], optional = true }
+async-trait = { version = "0.1", optional = true }
+tokio = { version = "0.2", features = ["macros"], optional = true }
+reqwest = { version = "0.10", optional = true }
+sha2 = { version = "0.9", optional = true }
+ureq = { version = "1.5", optional = true }

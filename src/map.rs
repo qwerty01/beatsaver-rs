@@ -19,7 +19,7 @@ pub struct MapDifficltyCharacteristic {
     pub length: usize,
     pub njs: usize,
     #[serde(alias = "njsOffset")]
-    pub njs_offset: i64,
+    pub njs_offset: f32,
     pub bombs: usize,
     pub notes: usize,
     pub obstacles: usize,
@@ -55,7 +55,7 @@ pub struct MapMetadata {
     pub song_name: String,
     #[serde(alias = "songSubName")]
     pub song_sub_name: String,
-    pub bpm: usize,
+    pub bpm: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(normal.notes, 301);
         assert_eq!(normal.obstacles, 24);
         assert_eq!(normal.njs, 10);
-        assert_eq!(normal.njs_offset, 0);
+        assert_eq!(normal.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.hard.is_some());
         let hard = characteristics.difficulties.hard.as_ref().unwrap();
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(hard.notes, 486);
         assert_eq!(hard.obstacles, 24);
         assert_eq!(hard.njs, 10);
-        assert_eq!(hard.njs_offset, 0);
+        assert_eq!(hard.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.expert.is_some());
         let expert = characteristics.difficulties.expert.as_ref().unwrap();
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(expert.notes, 620);
         assert_eq!(expert.obstacles, 24);
         assert_eq!(expert.njs, 10);
-        assert_eq!(expert.njs_offset, 0);
+        assert_eq!(expert.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.expert_plus.is_some());
         let expert_plus = characteristics.difficulties.expert_plus.as_ref().unwrap();
@@ -238,13 +238,13 @@ mod tests {
         assert_eq!(expert_plus.notes, 894);
         assert_eq!(expert_plus.obstacles, 0);
         assert_eq!(expert_plus.njs, 12);
-        assert_eq!(expert_plus.njs_offset, 0);
+        assert_eq!(expert_plus.njs_offset, 0f32);
 
         assert_eq!(v.metadata.song_name, "Shut Up and Dance");
         assert_eq!(v.metadata.song_sub_name, "WALK THE MOON");
         assert_eq!(v.metadata.song_author, "BennyDaBeast");
         assert_eq!(v.metadata.level_author, "bennydabeast");
-        assert_eq!(v.metadata.bpm, 128);
+        assert_eq!(v.metadata.bpm, 128f32);
 
         assert_eq!(v.stats.downloads, 418854);
         assert_eq!(v.stats.plays, 558);
