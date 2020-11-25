@@ -8,7 +8,7 @@ license-file = "LICENSE"
 repository = "https://github.com/qwerty01/beatsaver-rs"
 
 [features]
-default = ["curl"]
+default = ["reqwest_backend"]
 async = ["async-trait"]
 surf_backend = ["async-std", "surf", "async"]
 reqwest_backend = ["tokio", "reqwest", "async"]
