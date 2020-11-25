@@ -219,6 +219,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "chrono",
+ "curl",
  "hex",
  "lazy_static",
  "reqwest",
