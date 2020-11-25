@@ -1,21 +1,21 @@
 #[cfg(feature = "async")]
 use async_trait::async_trait;
+use bytes::Bytes;
 use hex::{self, FromHexError};
 use lazy_static::lazy_static;
+use map::Map;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::convert::{From, TryFrom, TryInto};
 use std::error::Error;
 use std::fmt;
 use std::num::ParseIntError;
-use url::Url;
-use map::Map;
-use urlencoding::encode;
 use std::string::FromUtf8Error;
-use bytes::Bytes;
+use url::Url;
+use urlencoding::encode;
 
-pub mod map;
 pub mod client;
+pub mod map;
 
 lazy_static! {
     static ref BEATSAVER_API: Url = Url::parse("https://beatsaver.com/api/").unwrap();
@@ -107,7 +107,7 @@ pub enum BeatSyncApiError<T: fmt::Display> {
     RequestError(T),
     SerializeError(serde_json::Error),
     ArgumentError(&'static str),
-    Utf8Error(FromUtf8Error)
+    Utf8Error(FromUtf8Error),
 }
 impl<T: fmt::Display> fmt::Display for BeatSyncApiError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -115,7 +115,7 @@ impl<T: fmt::Display> fmt::Display for BeatSyncApiError<T> {
             Self::RequestError(e) => <T as fmt::Display>::fmt(e, f),
             Self::SerializeError(e) => e.fmt(f),
             Self::ArgumentError(a) => write!(f, "Invalid argument: {}", a),
-            Self::Utf8Error(e) => e.fmt(f)
+            Self::Utf8Error(e) => e.fmt(f),
         }
     }
 }
@@ -132,7 +132,10 @@ impl<T: Error> From<FromUtf8Error> for BeatSyncApiError<T> {
 
 #[cfg(feature = "async")]
 #[async_trait]
-pub trait BeatSyncApiAsync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T> {
+pub trait BeatSyncApiAsync<'a, T: 'a + Error>
+where
+    BeatSyncApiError<T>: From<T>,
+{
     async fn request_raw(&'a self, url: Url) -> Result<Bytes, T>;
     async fn request(&'a self, url: Url) -> Result<String, BeatSyncApiError<T>> {
         let data = self.request_raw(url).await?;
@@ -145,46 +148,64 @@ pub trait BeatSyncApiAsync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T
                     BEATSAVER_API
                         .join(format!("maps/detail/{:x}", k).as_str())
                         .unwrap(),
-                ).await?
+                )
+                .await?
             }
             MapId::Hash(h) => {
                 self.request(
                     BEATSAVER_API
                         .join(format!("maps/by-hash/{}", h).as_str())
                         .unwrap(),
-                ).await?
+                )
+                .await?
             }
         };
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_by(&'a self, user: &BeatSaverUser) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join(format!("maps/uploader/{}", user.id).as_str()).unwrap()).await?;
+        let data = self
+            .request(
+                BEATSAVER_API
+                    .join(format!("maps/uploader/{}", user.id).as_str())
+                    .unwrap(),
+            )
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_hot(&'a self) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join("maps/hot").unwrap()).await?;
+        let data = self
+            .request(BEATSAVER_API.join("maps/hot").unwrap())
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_rating(&'a self) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join("maps/rating").unwrap()).await?;
+        let data = self
+            .request(BEATSAVER_API.join("maps/rating").unwrap())
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_latest(&'a self) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join("maps/latest").unwrap()).await?;
+        let data = self
+            .request(BEATSAVER_API.join("maps/latest").unwrap())
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_downloads(&'a self) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join("maps/downloads").unwrap()).await?;
+        let data = self
+            .request(BEATSAVER_API.join("maps/downloads").unwrap())
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn maps_plays(&'a self) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join("maps/plays").unwrap()).await?;
+        let data = self
+            .request(BEATSAVER_API.join("maps/plays").unwrap())
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
@@ -192,32 +213,62 @@ pub trait BeatSyncApiAsync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T
         if id.len() != 24 || hex::decode(&id).is_err() {
             return Err(BeatSyncApiError::ArgumentError("id"));
         }
-        let data = self.request(BEATSAVER_API.join(format!("users/find/{}", id).as_str()).unwrap()).await?;
+        let data = self
+            .request(
+                BEATSAVER_API
+                    .join(format!("users/find/{}", id).as_str())
+                    .unwrap(),
+            )
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn search(&'a self, query: String) -> Result<Page<Map>, BeatSyncApiError<T>> {
         let query = encode(query.as_str());
-        let data = self.request(BEATSAVER_API.join(format!("search/text?q={}", query).as_str()).unwrap()).await?;
+        let data = self
+            .request(
+                BEATSAVER_API
+                    .join(format!("search/text?q={}", query).as_str())
+                    .unwrap(),
+            )
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn search_advanced(&'a self, query: String) -> Result<Page<Map>, BeatSyncApiError<T>> {
         // TODO: Validate Lucene syntax
         let query = encode(query.as_str());
-        let data = self.request(BEATSAVER_API.join(format!("search/advanced?q={}", query).as_str()).unwrap()).await?;
+        let data = self
+            .request(
+                BEATSAVER_API
+                    .join(format!("search/advanced?q={}", query).as_str())
+                    .unwrap(),
+            )
+            .await?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     async fn download(&'a self, id: MapId) -> Result<Bytes, BeatSyncApiError<T>> {
-        Ok(self.request_raw(BEATSAVER_API.join(match id {
-            MapId::Key(k) => format!("download/key/{:x}", k),
-            MapId::Hash(h) => format!("download/hash/{}", h),
-        }.as_str()).unwrap()).await?)
+        Ok(self
+            .request_raw(
+                BEATSAVER_API
+                    .join(
+                        match id {
+                            MapId::Key(k) => format!("download/key/{:x}", k),
+                            MapId::Hash(h) => format!("download/hash/{}", h),
+                        }
+                        .as_str(),
+                    )
+                    .unwrap(),
+            )
+            .await?)
     }
 }
 #[cfg(feature = "sync")]
-pub trait BeatSyncApiSync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T> {
+pub trait BeatSyncApiSync<'a, T: 'a + Error>
+where
+    BeatSyncApiError<T>: From<T>,
+{
     fn request_raw(&'a self, url: Url) -> Result<Bytes, T>;
     fn request(&'a self, url: Url) -> Result<String, BeatSyncApiError<T>> {
         let data = self.request_raw(url)?;
@@ -225,26 +276,26 @@ pub trait BeatSyncApiSync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T>
     }
     fn map(&'a self, id: &MapId) -> Result<Map, BeatSyncApiError<T>> {
         let data = match id {
-            MapId::Key(k) => {
-                self.request(
-                    BEATSAVER_API
-                        .join(format!("maps/detail/{:x}", k).as_str())
-                        .unwrap(),
-                )?
-            }
-            MapId::Hash(h) => {
-                self.request(
-                    BEATSAVER_API
-                        .join(format!("maps/by-hash/{}", h).as_str())
-                        .unwrap(),
-                )?
-            }
+            MapId::Key(k) => self.request(
+                BEATSAVER_API
+                    .join(format!("maps/detail/{:x}", k).as_str())
+                    .unwrap(),
+            )?,
+            MapId::Hash(h) => self.request(
+                BEATSAVER_API
+                    .join(format!("maps/by-hash/{}", h).as_str())
+                    .unwrap(),
+            )?,
         };
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     fn maps_by(&'a self, user: &BeatSaverUser) -> Result<Page<Map>, BeatSyncApiError<T>> {
-        let data = self.request(BEATSAVER_API.join(format!("maps/uploader/{}", user.id).as_str()).unwrap())?;
+        let data = self.request(
+            BEATSAVER_API
+                .join(format!("maps/uploader/{}", user.id).as_str())
+                .unwrap(),
+        )?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
@@ -277,28 +328,47 @@ pub trait BeatSyncApiSync<'a, T: 'a + Error>  where BeatSyncApiError<T>: From<T>
         if id.len() != 24 || hex::decode(&id).is_err() {
             return Err(BeatSyncApiError::ArgumentError("id"));
         }
-        let data = self.request(BEATSAVER_API.join(format!("users/find/{}", id).as_str()).unwrap())?;
+        let data = self.request(
+            BEATSAVER_API
+                .join(format!("users/find/{}", id).as_str())
+                .unwrap(),
+        )?;
 
         Ok(serde_json::from_str(data.as_str())?)
     }
     fn search(&'a self, query: String) -> Result<Page<Map>, BeatSyncApiError<T>> {
         let query = encode(query.as_str());
-        let data = self.request(BEATSAVER_API.join(format!("search/text?q={}", query).as_str()).unwrap())?;
-    
+        let data = self.request(
+            BEATSAVER_API
+                .join(format!("search/text?q={}", query).as_str())
+                .unwrap(),
+        )?;
+
         Ok(serde_json::from_str(data.as_str())?)
     }
     fn search_advanced(&'a self, query: String) -> Result<Page<Map>, BeatSyncApiError<T>> {
         // TODO: Validate Lucene syntax
         let query = encode(query.as_str());
-        let data = self.request(BEATSAVER_API.join(format!("search/advanced?q={}", query).as_str()).unwrap())?;
-    
+        let data = self.request(
+            BEATSAVER_API
+                .join(format!("search/advanced?q={}", query).as_str())
+                .unwrap(),
+        )?;
+
         Ok(serde_json::from_str(data.as_str())?)
     }
     fn download(&'a self, id: MapId) -> Result<Bytes, BeatSyncApiError<T>> {
-        Ok(self.request_raw(BEATSAVER_API.join(match id {
-            MapId::Key(k) => format!("download/key/{:x}", k),
-            MapId::Hash(h) => format!("download/hash/{}", h),
-        }.as_str()).unwrap())?)
+        Ok(self.request_raw(
+            BEATSAVER_API
+                .join(
+                    match id {
+                        MapId::Key(k) => format!("download/key/{:x}", k),
+                        MapId::Hash(h) => format!("download/hash/{}", h),
+                    }
+                    .as_str(),
+                )
+                .unwrap(),
+        )?)
     }
 }
 
@@ -309,22 +379,22 @@ pub use BeatSyncApiSync as BeatSyncApi;
 
 #[cfg(test)]
 mod tests {
-    use crate::{BeatSyncApiError, Page};
     use crate::map::Map;
-    use std::fmt::{self, Display, Formatter};
-    use std::error::Error;
-    use url::Url;
-    #[cfg(feature = "async")]
-    use async_trait::async_trait;
     #[cfg(feature = "async")]
     use crate::BeatSyncApiAsync;
     #[cfg(feature = "sync")]
     use crate::BeatSyncApiSync;
+    use crate::{BeatSyncApiError, Page};
+    #[cfg(feature = "async")]
+    use async_trait::async_trait;
     use bytes::Bytes;
+    use std::error::Error;
+    use std::fmt::{self, Display, Formatter};
+    use url::Url;
 
     #[derive(Debug)]
-    enum FakeError { }
-    impl Display for FakeError{
+    enum FakeError {}
+    impl Display for FakeError {
         fn fmt(&self, _: &mut Formatter) -> fmt::Result {
             Ok(())
         }
@@ -337,7 +407,7 @@ mod tests {
     }
     struct FakeClient {
         url: Url,
-        data: Bytes
+        data: Bytes,
     }
     impl FakeClient {
         fn new(url: Url, data: Bytes) -> Self {
@@ -375,25 +445,34 @@ mod tests {
     }
     #[cfg(feature = "sync")]
     mod sync_tests {
-        use crate::{BeatSaverUser, BeatSyncApiSync};
-        use crate::BEATSAVER_API;
         use crate::tests::FakeClient;
+        use crate::BEATSAVER_API;
+        use crate::{BeatSaverUser, BeatSyncApiSync};
         use std::convert::TryInto;
 
         #[test]
         fn test_map() {
-            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
+            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
             client.map(&"1".to_string().try_into().unwrap()).unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
-            client.map(&"fda568fc27c20d21f8dc6f3709b49b5cc96723be".to_string().try_into().unwrap()).unwrap();
+            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
+            client
+                .map(
+                    &"fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .to_string()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap();
         }
         #[test]
         fn test_maps_by() {
             let client = FakeClient::new(BEATSAVER_API.join("maps/uploader/5cff0b7298cc5a672c84e8a3").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40619,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21772,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273492,"plays":31684,"downVotes":177,"upVotes":4246,"heat":21.0822877,"rating":0.9232332918273986},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.maps_by(&BeatSaverUser {
-                id: "5cff0b7298cc5a672c84e8a3".to_string(),
-                username: "datkami".to_string()
-            }).unwrap();
+            client
+                .maps_by(&BeatSaverUser {
+                    id: "5cff0b7298cc5a672c84e8a3".to_string(),
+                    username: "datkami".to_string(),
+                })
+                .unwrap();
         }
         #[test]
         fn test_maps_hot() {
@@ -422,7 +501,12 @@ mod tests {
         }
         #[test]
         fn test_user() {
-            let client = FakeClient::new(BEATSAVER_API.join("users/find/5fbe7cd60192c700062b2a1f").unwrap(), r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into());
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("users/find/5fbe7cd60192c700062b2a1f")
+                    .unwrap(),
+                r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into(),
+            );
             client.user("5fbe7cd60192c700062b2a1f".to_string()).unwrap();
         }
         #[test]
@@ -433,38 +517,68 @@ mod tests {
         #[test]
         fn test_search_advanced() {
             let client = FakeClient::new(BEATSAVER_API.join("search/advanced?q=metadata.levelAuthor%3Adatkami").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86172,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273593,"plays":31684,"downVotes":178,"upVotes":4248,"heat":21.0823944,"rating":0.923057857514794},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21773,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40640,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.search_advanced("metadata.levelAuthor:datkami".to_string()).unwrap();
+            client
+                .search_advanced("metadata.levelAuthor:datkami".to_string())
+                .unwrap();
         }
         #[test]
         fn test_download() {
-            let client = FakeClient::new(BEATSAVER_API.join("download/key/1").unwrap(), "map #1".into());
+            let client = FakeClient::new(
+                BEATSAVER_API.join("download/key/1").unwrap(),
+                "map #1".into(),
+            );
             client.download("1".try_into().unwrap()).unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(), "map #1".into());
-            client.download("fda568fc27c20d21f8dc6f3709b49b5cc96723be".try_into().unwrap()).unwrap();
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be")
+                    .unwrap(),
+                "map #1".into(),
+            );
+            client
+                .download(
+                    "fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap();
         }
     }
     #[cfg(feature = "async-std")]
     mod async_std_tests {
-        use crate::{BeatSyncApiAsync, BeatSaverUser};
-        use crate::BEATSAVER_API;
-        use std::convert::TryInto;
         use crate::tests::FakeClient;
+        use crate::BEATSAVER_API;
+        use crate::{BeatSaverUser, BeatSyncApiAsync};
         use async_std::test as async_test;
+        use std::convert::TryInto;
 
         #[async_test]
         async fn test_map() {
-            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
-            client.map(&"1".to_string().try_into().unwrap()).await.unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
-            client.map(&"fda568fc27c20d21f8dc6f3709b49b5cc96723be".to_string().try_into().unwrap()).await.unwrap();
+            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
+            client
+                .map(&"1".to_string().try_into().unwrap())
+                .await
+                .unwrap();
+            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
+            client
+                .map(
+                    &"fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .to_string()
+                        .try_into()
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_maps_by() {
             let client = FakeClient::new(BEATSAVER_API.join("maps/uploader/5cff0b7298cc5a672c84e8a3").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40619,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21772,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273492,"plays":31684,"downVotes":177,"upVotes":4246,"heat":21.0822877,"rating":0.9232332918273986},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.maps_by(&BeatSaverUser {
-                id: "5cff0b7298cc5a672c84e8a3".to_string(),
-                username: "datkami".to_string()
-            }).await.unwrap();
+            client
+                .maps_by(&BeatSaverUser {
+                    id: "5cff0b7298cc5a672c84e8a3".to_string(),
+                    username: "datkami".to_string(),
+                })
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_maps_hot() {
@@ -493,8 +607,16 @@ mod tests {
         }
         #[async_test]
         async fn test_user() {
-            let client = FakeClient::new(BEATSAVER_API.join("users/find/5fbe7cd60192c700062b2a1f").unwrap(), r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into());
-            client.user("5fbe7cd60192c700062b2a1f".to_string()).await.unwrap();
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("users/find/5fbe7cd60192c700062b2a1f")
+                    .unwrap(),
+                r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into(),
+            );
+            client
+                .user("5fbe7cd60192c700062b2a1f".to_string())
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_search() {
@@ -504,38 +626,70 @@ mod tests {
         #[async_test]
         async fn test_search_advanced() {
             let client = FakeClient::new(BEATSAVER_API.join("search/advanced?q=metadata.levelAuthor%3Adatkami").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86172,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273593,"plays":31684,"downVotes":178,"upVotes":4248,"heat":21.0823944,"rating":0.923057857514794},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21773,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40640,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.search_advanced("metadata.levelAuthor:datkami".to_string()).await.unwrap();
+            client
+                .search_advanced("metadata.levelAuthor:datkami".to_string())
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_download() {
-            let client = FakeClient::new(BEATSAVER_API.join("download/key/1").unwrap(), "map #1".into());
+            let client = FakeClient::new(
+                BEATSAVER_API.join("download/key/1").unwrap(),
+                "map #1".into(),
+            );
             client.download("1".try_into().unwrap()).await.unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(), "map #1".into());
-            client.download("fda568fc27c20d21f8dc6f3709b49b5cc96723be".try_into().unwrap()).await.unwrap();
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be")
+                    .unwrap(),
+                "map #1".into(),
+            );
+            client
+                .download(
+                    "fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .try_into()
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
         }
     }
     #[cfg(feature = "tokio")]
     mod tokio_tests {
-        use crate::{BeatSyncApiAsync, BeatSaverUser};
-        use crate::BEATSAVER_API;
-        use std::convert::TryInto;
         use crate::tests::FakeClient;
+        use crate::BEATSAVER_API;
+        use crate::{BeatSaverUser, BeatSyncApiAsync};
+        use std::convert::TryInto;
         use tokio::test as async_test;
 
         #[async_test]
         async fn test_map() {
-            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
-            client.map(&"1".to_string().try_into().unwrap()).await.unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into()); 
-            client.map(&"fda568fc27c20d21f8dc6f3709b49b5cc96723be".to_string().try_into().unwrap()).await.unwrap();
+            let client = FakeClient::new(BEATSAVER_API.join("maps/detail/1").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
+            client
+                .map(&"1".to_string().try_into().unwrap())
+                .await
+                .unwrap();
+            let client = FakeClient::new(BEATSAVER_API.join("maps/by-hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(),  r#"{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}"#.into());
+            client
+                .map(
+                    &"fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .to_string()
+                        .try_into()
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_maps_by() {
             let client = FakeClient::new(BEATSAVER_API.join("maps/uploader/5cff0b7298cc5a672c84e8a3").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40619,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21772,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273492,"plays":31684,"downVotes":177,"upVotes":4246,"heat":21.0822877,"rating":0.9232332918273986},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86164,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.maps_by(&BeatSaverUser {
-                id: "5cff0b7298cc5a672c84e8a3".to_string(),
-                username: "datkami".to_string()
-            }).await.unwrap();
+            client
+                .maps_by(&BeatSaverUser {
+                    id: "5cff0b7298cc5a672c84e8a3".to_string(),
+                    username: "datkami".to_string(),
+                })
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_maps_hot() {
@@ -564,8 +718,16 @@ mod tests {
         }
         #[async_test]
         async fn test_user() {
-            let client = FakeClient::new(BEATSAVER_API.join("users/find/5fbe7cd60192c700062b2a1f").unwrap(), r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into());
-            client.user("5fbe7cd60192c700062b2a1f".to_string()).await.unwrap();
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("users/find/5fbe7cd60192c700062b2a1f")
+                    .unwrap(),
+                r#"{"_id":"5fbe7cd60192c700062b2a1f","username":"qw3rty01"}"#.into(),
+            );
+            client
+                .user("5fbe7cd60192c700062b2a1f".to_string())
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_search() {
@@ -575,14 +737,32 @@ mod tests {
         #[async_test]
         async fn test_search_advanced() {
             let client = FakeClient::new(BEATSAVER_API.join("search/advanced?q=metadata.levelAuthor%3Adatkami").unwrap(), r#"{"docs":[{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":true,"expert":false,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":{"duration":188.625,"length":141,"bombs":28,"notes":337,"obstacles":11,"njs":10,"njsOffset":0},"expert":null,"expertPlus":null}}],"songName":"me & u","songSubName":"","songAuthorName":"succducc","levelAuthorName":"datkami","bpm":160},"stats":{"downloads":86172,"plays":8377,"downVotes":110,"upVotes":512,"heat":17.2028038,"rating":0.7765731134313741},"description":"Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u","deletedAt":null,"_id":"5cff620c48229f7d88fc60df","key":"1","name":"succducc - me & u","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-08T14:28:56.000Z","hash":"fda568fc27c20d21f8dc6f3709b49b5cc96723be","directDownload":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip","downloadURL":"/api/download/key/1","coverURL":"/cdn/1/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":291,"length":136,"bombs":4,"notes":353,"obstacles":15,"njs":10,"njsOffset":0},"hard":{"duration":291,"length":136,"bombs":4,"notes":455,"obstacles":15,"njs":10,"njsOffset":0},"expert":{"duration":291,"length":136,"bombs":10,"notes":526,"obstacles":15,"njs":10,"njsOffset":0},"expertPlus":null}}],"songName":"LUVORATORRRRRY!","songSubName":"feat.nqrse","songAuthorName":"Reol","levelAuthorName":"datkami","bpm":128},"stats":{"downloads":273593,"plays":31684,"downVotes":178,"upVotes":4248,"heat":21.0823944,"rating":0.923057857514794},"description":"Hard (353 notes) / Hard+ (455 notes) / Expert (526 notes) / 15 Obstacles / Video Demonstration: https://streamable.com/23ayv / Part 1 of the J-EDM Graduation series! Use this song pack to level up your game!","deletedAt":null,"_id":"5cff620c48229f7d88fc60fe","key":"21","name":"REOL feat. nqrse - LUVORATORRRRRY!","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-10T02:24:36.000Z","hash":"c807689fefdae82aa79ba9c7f861118fb426b4cc","directDownload":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.zip","downloadURL":"/api/download/key/21","coverURL":"/cdn/21/c807689fefdae82aa79ba9c7f861118fb426b4cc.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":true,"hard":true,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":{"duration":482,"length":199,"bombs":20,"notes":583,"obstacles":38,"njs":12,"njsOffset":0},"hard":{"duration":482,"length":199,"bombs":20,"notes":640,"obstacles":30,"njs":12,"njsOffset":0},"expert":{"duration":482,"length":199,"bombs":20,"notes":734,"obstacles":19,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Kodokushi","songSubName":"Kami","songAuthorName":"Mihka! x Kyoto Black","levelAuthorName":"datkami","bpm":145},"stats":{"downloads":21773,"plays":2937,"downVotes":17,"upVotes":327,"heat":30.7342061,"rating":0.87298999599274},"description":"Hard (583 Notes) / Hard+ (640 Notes) / Expert (734 Notes) / Event lighting! / Part 2 of the J-EDM Graduation series, a setlist of maps meant to help you bridge the gap between Hard and Expert! / Mapped by Kami#9635  / Video Demonstration: https://streamable.com/n3h12 / If you like the track, be sure to sign up for Beat Saver and give it a LIKE!","deletedAt":null,"_id":"5cff620c48229f7d88fc6171","key":"98","name":"Mihka! x Kyoto Black - Kodokushi","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-05-15T17:02:08.000Z","hash":"f829a801f10366ae4f61b8daabcf133209a65789","directDownload":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.zip","downloadURL":"/api/download/key/98","coverURL":"/cdn/98/f829a801f10366ae4f61b8daabcf133209a65789.jpg"},{"metadata":{"difficulties":{"easy":false,"normal":false,"hard":false,"expert":true,"expertPlus":false},"duration":0,"automapper":null,"characteristics":[{"name":"Standard","difficulties":{"easy":null,"normal":null,"hard":null,"expert":{"duration":655.5,"length":228,"bombs":28,"notes":865,"obstacles":31,"njs":12,"njsOffset":0},"expertPlus":null}}],"songName":"Coconut Cabana","songSubName":"Ikura","songAuthorName":"Kami","levelAuthorName":"datkami","bpm":172},"stats":{"downloads":40640,"plays":201,"downVotes":43,"upVotes":207,"heat":326.6865772,"rating":0.7658415646708089},"description":"172 BPM / Expert (865 notes) / my lights are pretty / Video Demonstration: https://streamable.com/2yo6w / shout out to @ikuratunes for making this bangin' track https://soundcloud.com/chunchunmarudesu/coconut-cabana","deletedAt":null,"_id":"5cff621048229f7d88fc73e2","key":"1a98","name":"ikura - Coconut Cabana","uploader":{"_id":"5cff0b7298cc5a672c84e8a3","username":"datkami"},"uploaded":"2018-10-16T23:53:48.000Z","hash":"023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f","directDownload":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.zip","downloadURL":"/api/download/key/1a98","coverURL":"/cdn/1a98/023ae70b643a2abe62c9dbc9e3fdfd9c325f0f1f.jpg"}],"totalDocs":4,"lastPage":0,"prevPage":null,"nextPage":null}"#.into());
-            client.search_advanced("metadata.levelAuthor:datkami".to_string()).await.unwrap();
+            client
+                .search_advanced("metadata.levelAuthor:datkami".to_string())
+                .await
+                .unwrap();
         }
         #[async_test]
         async fn test_download() {
-            let client = FakeClient::new(BEATSAVER_API.join("download/key/1").unwrap(), "map #1".into());
+            let client = FakeClient::new(
+                BEATSAVER_API.join("download/key/1").unwrap(),
+                "map #1".into(),
+            );
             client.download("1".try_into().unwrap()).await.unwrap();
-            let client = FakeClient::new(BEATSAVER_API.join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be").unwrap(), "map #1".into());
-            client.download("fda568fc27c20d21f8dc6f3709b49b5cc96723be".try_into().unwrap()).await.unwrap();
+            let client = FakeClient::new(
+                BEATSAVER_API
+                    .join("download/hash/fda568fc27c20d21f8dc6f3709b49b5cc96723be")
+                    .unwrap(),
+                "map #1".into(),
+            );
+            client
+                .download(
+                    "fda568fc27c20d21f8dc6f3709b49b5cc96723be"
+                        .try_into()
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
         }
     }
 }

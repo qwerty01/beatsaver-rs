@@ -1,20 +1,27 @@
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
-    use reqwest::Client;
     use crate::{BeatSyncApiAsync, BeatSyncApiError};
     use async_trait::async_trait;
-    use url::Url;
-    use std::convert::From;
     use bytes::Bytes;
+    use reqwest::Client;
+    use std::convert::From;
+    use url::Url;
 
     #[derive(Debug, Clone)]
     pub struct BeatSyncReqwest {
-        client: Client
+        client: Client,
     }
     impl BeatSyncReqwest {
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            let client = Client::builder().user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))).build().unwrap();
+            let client = Client::builder()
+                .user_agent(concat!(
+                    env!("CARGO_PKG_NAME"),
+                    "/",
+                    env!("CARGO_PKG_VERSION")
+                ))
+                .build()
+                .unwrap();
             Self { client }
         }
     }
@@ -32,28 +39,32 @@ mod reqwest_client {
 }
 #[cfg(feature = "reqwest_backend")]
 pub use reqwest_client::BeatSyncReqwest;
-#[cfg(all(feature = "reqwest_backend", not(feature = "surf_backend"), not(feature = "ureq_backend")))]
+#[cfg(all(
+    feature = "reqwest_backend",
+    not(feature = "surf_backend"),
+    not(feature = "ureq_backend")
+))]
 pub use reqwest_client::BeatSyncReqwest as BeatSync;
 
 #[cfg(feature = "surf_backend")]
 mod surf_client {
-    use surf::Client;
     use crate::{BeatSyncApiAsync, BeatSyncApiError};
     use async_trait::async_trait;
-    use url::Url;
-    use std::convert::From;
-    use std::fmt::{self, Display, Formatter};
-    use std::error::Error;
     use bytes::Bytes;
-    
+    use std::convert::From;
+    use std::error::Error;
+    use std::fmt::{self, Display, Formatter};
+    use surf::Client;
+    use url::Url;
+
     #[derive(Debug)]
     pub enum SurfError {
-        Error(surf::Error)
+        Error(surf::Error),
     }
     impl Display for SurfError {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             match self {
-                Self::Error(e) => e.fmt(f)
+                Self::Error(e) => e.fmt(f),
             }
         }
     }
@@ -73,10 +84,10 @@ mod surf_client {
             Self::RequestError(e.into())
         }
     }
-    
+
     #[derive(Debug, Clone)]
     pub struct BeatSyncSurf {
-        client: Client
+        client: Client,
     }
     impl BeatSyncSurf {
         // TODO: Allow user to specify client
@@ -94,31 +105,34 @@ mod surf_client {
 }
 #[cfg(feature = "surf_backend")]
 pub use surf_client::BeatSyncSurf;
-#[cfg(all(feature = "surf_backend", not(feature = "reqwest_backend"), not(feature = "ureq_backend")))]
+#[cfg(all(
+    feature = "surf_backend",
+    not(feature = "reqwest_backend"),
+    not(feature = "ureq_backend")
+))]
 pub use surf_client::BeatSyncSurf as BeatSync;
 
 #[cfg(feature = "ureq_backend")]
 mod ureq_client {
-    use ureq;
-    use crate::{BeatSyncApiSync, BeatSyncApiError};
-    use url::Url;
-    use std::convert::From;
+    use crate::{BeatSyncApiError, BeatSyncApiSync};
     use bytes::Bytes;
+    use std::convert::From;
     use std::io::Read;
+    use ureq;
+    use url::Url;
 
     impl From<ureq::Error> for BeatSyncApiError<ureq::Error> {
         fn from(e: ureq::Error) -> Self {
             Self::RequestError(e)
         }
     }
-    
+
     #[derive(Debug)]
-    pub struct BeatSyncUreq {
-    }
+    pub struct BeatSyncUreq {}
     impl BeatSyncUreq {
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            Self { }
+            Self {}
         }
     }
     impl<'a> BeatSyncApiSync<'a, ureq::Error> for BeatSyncUreq {
@@ -134,7 +148,11 @@ mod ureq_client {
 }
 #[cfg(feature = "ureq_backend")]
 pub use ureq_client::BeatSyncUreq;
-#[cfg(all(feature = "ureq_backend", not(feature = "reqwest_backend"), not(feature = "surf_backend")))]
+#[cfg(all(
+    feature = "ureq_backend",
+    not(feature = "reqwest_backend"),
+    not(feature = "surf_backend")
+))]
 pub use ureq_client::BeatSyncUreq as BeatSync;
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 # beatsaver-rs
 
 [![Crates.io](https://img.shields.io/crates/v/beatsaver-rs.svg)](https://crates.io/crates/beatsaver-rs)
-[![Documentation](https://docs.rs/beatsaver-rs/badge.svg)](https://docs.rs/qwerty01/beatsaver-rs)
+[![Documentation](https://docs.rs/beatsaver-rs/badge.svg)](https://docs.rs/beatsaver-rs)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/qwerty01/beatsaver-rs)](https://github.com/qwerty01/beatsaver-rs/issues)
 [![Build](https://github.com/qwerty01/beatsaver-rs/workflows/Build/badge.svg)](https://github.com/qwerty01/beatsaver-rs/actions?query=workflow%3ABuild)
