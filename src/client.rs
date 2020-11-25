@@ -5,6 +5,7 @@ mod reqwest_client {
     use async_trait::async_trait;
     use url::Url;
     use std::convert::From;
+    use bytes::Bytes;
 
     #[derive(Debug, Clone)]
     pub struct BeatSyncReqwest {
@@ -24,8 +25,8 @@ mod reqwest_client {
     }
     #[async_trait]
     impl<'a> BeatSyncApiAsync<'a, reqwest::Error> for BeatSyncReqwest {
-        async fn request(&'a self, url: Url) -> Result<String, reqwest::Error> {
-            self.client.get(url).send().await?.text().await
+        async fn request_raw(&'a self, url: Url) -> Result<Bytes, reqwest::Error> {
+            self.client.get(url).send().await?.bytes().await
         }
     }
 }
@@ -43,6 +44,7 @@ mod surf_client {
     use std::convert::From;
     use std::fmt::{self, Display, Formatter};
     use std::error::Error;
+    use bytes::Bytes;
     
     #[derive(Debug)]
     pub enum SurfError {
@@ -85,8 +87,8 @@ mod surf_client {
     }
     #[async_trait]
     impl<'a> BeatSyncApiAsync<'a, SurfError> for BeatSyncSurf {
-        async fn request(&'a self, url: Url) -> Result<String, SurfError> {
-            Ok(self.client.get(url).recv_string().await?)
+        async fn request_raw(&'a self, url: Url) -> Result<Bytes, SurfError> {
+            Ok(self.client.get(url).recv_bytes().await?.into())
         }
     }
 }
@@ -101,6 +103,8 @@ mod ureq_client {
     use crate::{BeatSyncApiSync, BeatSyncApiError};
     use url::Url;
     use std::convert::From;
+    use bytes::Bytes;
+    use std::io::Read;
 
     impl From<ureq::Error> for BeatSyncApiError<ureq::Error> {
         fn from(e: ureq::Error) -> Self {
@@ -118,8 +122,13 @@ mod ureq_client {
         }
     }
     impl<'a> BeatSyncApiSync<'a, ureq::Error> for BeatSyncUreq {
-        fn request(&'a self, url: Url) -> Result<String, ureq::Error> {
-            Ok(ureq::get(url.as_str()).call().into_string()?)
+        fn request_raw(&'a self, url: Url) -> Result<Bytes, ureq::Error> {
+            let mut contents = vec![];
+            let resp = ureq::get(url.as_str()).call();
+            let mut reader = resp.into_reader();
+            reader.read_to_end(&mut contents)?;
+
+            Ok(contents.into())
         }
     }
 }
