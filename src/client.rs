@@ -1,7 +1,7 @@
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
     use reqwest::Client;
-    use crate::{BeatSyncApi, BeatSyncApiError};
+    use crate::{BeatSyncApiAsync, BeatSyncApiError};
     use async_trait::async_trait;
     use url::Url;
     use std::convert::From;
@@ -23,22 +23,21 @@ mod reqwest_client {
         }
     }
     #[async_trait]
-    impl<'a> BeatSyncApi<'a, reqwest::Error> for BeatSyncReqwest {
+    impl<'a> BeatSyncApiAsync<'a, reqwest::Error> for BeatSyncReqwest {
         async fn request(&'a self, url: Url) -> Result<String, reqwest::Error> {
             self.client.get(url).send().await?.text().await
         }
     }
 }
-
 #[cfg(feature = "reqwest_backend")]
 pub use reqwest_client::BeatSyncReqwest;
-#[cfg(all(feature = "reqwest_backend", not(feature = "surf_backend"), not(feature = "curl")))]
+#[cfg(all(feature = "reqwest_backend", not(feature = "surf_backend"), not(feature = "ureq_backend")))]
 pub use reqwest_client::BeatSyncReqwest as BeatSync;
 
 #[cfg(feature = "surf_backend")]
 mod surf_client {
     use surf::Client;
-    use crate::{BeatSyncApi, BeatSyncApiError};
+    use crate::{BeatSyncApiAsync, BeatSyncApiError};
     use async_trait::async_trait;
     use url::Url;
     use std::convert::From;
@@ -85,17 +84,49 @@ mod surf_client {
         }
     }
     #[async_trait]
-    impl<'a> BeatSyncApi<'a, SurfError> for BeatSyncSurf {
+    impl<'a> BeatSyncApiAsync<'a, SurfError> for BeatSyncSurf {
         async fn request(&'a self, url: Url) -> Result<String, SurfError> {
             Ok(self.client.get(url).recv_string().await?)
         }
     }
 }
-
 #[cfg(feature = "surf_backend")]
 pub use surf_client::BeatSyncSurf;
-#[cfg(all(feature = "surf_backend", not(feature = "reqwest_backend"), not(feature = "curl")))]
+#[cfg(all(feature = "surf_backend", not(feature = "reqwest_backend"), not(feature = "ureq_backend")))]
 pub use surf_client::BeatSyncSurf as BeatSync;
+
+#[cfg(feature = "ureq_backend")]
+mod ureq_client {
+    use ureq;
+    use crate::{BeatSyncApiSync, BeatSyncApiError};
+    use url::Url;
+    use std::convert::From;
+
+    impl From<ureq::Error> for BeatSyncApiError<ureq::Error> {
+        fn from(e: ureq::Error) -> Self {
+            Self::RequestError(e)
+        }
+    }
+    
+    #[derive(Debug)]
+    pub struct BeatSyncUreq {
+    }
+    impl BeatSyncUreq {
+        // TODO: Allow user to specify client
+        pub fn new() -> Self {
+            Self { }
+        }
+    }
+    impl<'a> BeatSyncApiSync<'a, ureq::Error> for BeatSyncUreq {
+        fn request(&'a self, url: Url) -> Result<String, ureq::Error> {
+            Ok(ureq::get(url.as_str()).call().into_string()?)
+        }
+    }
+}
+#[cfg(feature = "ureq_backend")]
+pub use ureq_client::BeatSyncUreq;
+#[cfg(all(feature = "ureq_backend", not(feature = "reqwest_backend"), not(feature = "surf_backend")))]
+pub use ureq_client::BeatSyncUreq as BeatSync;
 
 #[cfg(test)]
 mod tests {
@@ -103,7 +134,7 @@ mod tests {
     #[async_std::test]
     async fn test_surf_map() {
         use crate::client::BeatSyncSurf;
-        use crate::BeatSyncApi;
+        use crate::BeatSyncApiAsync;
         use std::convert::TryInto;
 
         let client = BeatSyncSurf::new();
@@ -115,11 +146,23 @@ mod tests {
     #[tokio::test]
     async fn test_reqwest_map() {
         use crate::client::BeatSyncReqwest;
-        use crate::BeatSyncApi;
+        use crate::BeatSyncApiAsync;
         use std::convert::TryInto;
 
         let client = BeatSyncReqwest::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
+
+        assert_eq!(map.key, "2144");
+    }
+    #[cfg(feature = "ureq_backend")]
+    #[test]
+    fn test_ureq_map() {
+        use crate::client::BeatSyncUreq;
+        use crate::BeatSyncApiSync;
+        use std::convert::TryInto;
+
+        let client = BeatSyncUreq::new();
+        let map = client.map(&"2144".try_into().unwrap()).unwrap();
 
         assert_eq!(map.key, "2144");
     }
