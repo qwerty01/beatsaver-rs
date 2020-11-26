@@ -25,3 +25,10 @@ jobs:
         cargo test --no-default-features --features surf_backend --verbose
         cargo test --no-default-features --features ureq_backend --verbose
         cargo test --verbose
+    - name: Generate docs
+      run: |
+        cargo doc --all-features --verbose
+        cargo doc --no-default-features --features reqwest_backend --verbose
+        cargo doc --no-default-features --features surf_backend --verbose
+        cargo doc --no-default-features --features ureq_backend --verbose
+        cargo doc --verbose
