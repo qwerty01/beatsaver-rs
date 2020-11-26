@@ -10,8 +10,9 @@ This project is a Rust library for interacting with the beatsaver.com api.
 
 ## Installation
 
-```bash
-cargo install beatsaver-rs
+Add the following to your dependencies:
+```toml
+beatsaver-rs = 0.0.2
 ```
 
 ## Usage
