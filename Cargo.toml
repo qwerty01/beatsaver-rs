@@ -4,7 +4,7 @@ version = "0.0.2"
 description = "A Rust library for interacting with the beatsaver.com api"
 authors = ["qwerty01 <qw3rty01@gmail.com>"]
 edition = "2018"
-license-file = "LICENSE"
+license = "MIT"
 repository = "https://github.com/qwerty01/beatsaver-rs"
 
 [features]
