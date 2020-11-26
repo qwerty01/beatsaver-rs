@@ -17,7 +17,7 @@ mod reqwest_client {
     use std::convert::From;
     use url::Url;
 
-    /// [BeatSaverApi][crate::BeatSaverApi] implemented for [Reqwest][reqwest]
+    /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Reqwest][reqwest]
     #[derive(Debug, Clone)]
     pub struct BeatSaverReqwest {
         client: Client,
@@ -106,7 +106,7 @@ mod surf_client {
         }
     }
 
-    /// [BeatSaverApi][crate::BeatSaverApi] implemented for [Surf][surf]
+    /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Surf][surf]
     #[derive(Debug, Clone)]
     pub struct BeatSaverSurf {
         client: Client,
@@ -157,7 +157,7 @@ mod ureq_client {
         }
     }
 
-    /// [BeatSaverApi][crate::BeatSaverApi] implemented for [ureq]
+    /// [BeatSaverApi][crate::BeatSaverApiSync] implemented for [ureq]
     #[derive(Debug)]
     pub struct BeatSaverUreq {}
     impl BeatSaverUreq {
