@@ -1,59 +1,91 @@
+//! # Client
+//!
+//! This module contains client backend implmeentations.
+//!
+//! The following backends are implemented:
+//! * [Reqwest](https://crates.io/crates/reqwest) => `reqwest_backend` feature (asynchronous, uses [Tokio](https://crates.io/crates/tokio))
+//! * [Surf](https://crates.io/crates/surf) => `surf_backend` feature (asynchronous, uses [async-std](https://crates.io/crates/async-std))
+//! * [ureq](https://crates.io/crates/ureq) => `ureq_backend` feature (synchronous)
+//!
+//! If only one backend is specified, it will be aliased to `BeatSaver`
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
-    use reqwest::Client;
-    use crate::{BeatSyncApiAsync, BeatSyncApiError};
+    use crate::{BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
-    use url::Url;
-    use std::convert::From;
     use bytes::Bytes;
+    use reqwest::Client;
+    use std::convert::From;
+    use url::Url;
 
+    /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Reqwest][reqwest]
     #[derive(Debug, Clone)]
-    pub struct BeatSyncReqwest {
-        client: Client
+    pub struct BeatSaverReqwest {
+        client: Client,
     }
-    impl BeatSyncReqwest {
+    impl BeatSaverReqwest {
+        /// Creates a new [BeatSaverReqwest][crate::client::BeatSaverReqwest] object, initiailizing a [Reqwest Client][reqwest::Client]
+        ///
+        /// Example:
+        /// ```no_run
+        /// use beatsaver_rs::client::BeatSaverReqwest;
+        ///
+        /// let client = BeatSaverReqwest::new();
+        /// ```
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            let client = Client::builder().user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))).build().unwrap();
+            let client = Client::builder()
+                .user_agent(concat!(
+                    env!("CARGO_PKG_NAME"),
+                    "/",
+                    env!("CARGO_PKG_VERSION")
+                ))
+                .build()
+                .unwrap();
             Self { client }
         }
     }
-    impl From<reqwest::Error> for BeatSyncApiError<reqwest::Error> {
+    impl From<reqwest::Error> for BeatSaverApiError<reqwest::Error> {
         fn from(e: reqwest::Error) -> Self {
             Self::RequestError(e)
         }
     }
     #[async_trait]
-    impl<'a> BeatSyncApiAsync<'a, reqwest::Error> for BeatSyncReqwest {
+    impl<'a> BeatSaverApiAsync<'a, reqwest::Error> for BeatSaverReqwest {
         async fn request_raw(&'a self, url: Url) -> Result<Bytes, reqwest::Error> {
             self.client.get(url).send().await?.bytes().await
         }
     }
 }
 #[cfg(feature = "reqwest_backend")]
-pub use reqwest_client::BeatSyncReqwest;
-#[cfg(all(feature = "reqwest_backend", not(feature = "surf_backend"), not(feature = "ureq_backend")))]
-pub use reqwest_client::BeatSyncReqwest as BeatSync;
+pub use reqwest_client::BeatSaverReqwest;
+#[cfg(all(
+    feature = "reqwest_backend",
+    not(feature = "surf_backend"),
+    not(feature = "ureq_backend")
+))]
+pub use reqwest_client::BeatSaverReqwest as BeatSaver;
 
 #[cfg(feature = "surf_backend")]
 mod surf_client {
-    use surf::Client;
-    use crate::{BeatSyncApiAsync, BeatSyncApiError};
+    use crate::{BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
-    use url::Url;
-    use std::convert::From;
-    use std::fmt::{self, Display, Formatter};
-    use std::error::Error;
     use bytes::Bytes;
-    
+    use std::convert::From;
+    use std::error::Error;
+    use std::fmt::{self, Display, Formatter};
+    use surf::Client;
+    use url::Url;
+
+    /// [Error][std::error::Error] wrapper type for [surf::Error]
     #[derive(Debug)]
     pub enum SurfError {
-        Error(surf::Error)
+        /// Surf error
+        Error(surf::Error),
     }
     impl Display for SurfError {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             match self {
-                Self::Error(e) => e.fmt(f)
+                Self::Error(e) => e.fmt(f),
             }
         }
     }
@@ -63,22 +95,31 @@ mod surf_client {
             Self::Error(e)
         }
     }
-    impl From<SurfError> for BeatSyncApiError<SurfError> {
+    impl From<SurfError> for BeatSaverApiError<SurfError> {
         fn from(e: SurfError) -> Self {
             Self::RequestError(e)
         }
     }
-    impl From<surf::Error> for BeatSyncApiError<SurfError> {
+    impl From<surf::Error> for BeatSaverApiError<SurfError> {
         fn from(e: surf::Error) -> Self {
             Self::RequestError(e.into())
         }
     }
-    
+
+    /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Surf][surf]
     #[derive(Debug, Clone)]
-    pub struct BeatSyncSurf {
-        client: Client
+    pub struct BeatSaverSurf {
+        client: Client,
     }
-    impl BeatSyncSurf {
+    impl BeatSaverSurf {
+        /// Creates a new [BeatSaverSurf][crate::client::BeatSaverSurf] object, initiailizing a [Surf Client][surf::Client]
+        ///
+        /// Example:
+        /// ```no_run
+        /// use beatsaver_rs::client::BeatSaverSurf;
+        ///
+        /// let client = BeatSaverSurf::new();
+        /// ```
         // TODO: Allow user to specify client
         pub fn new() -> Self {
             let client = Client::new();
@@ -86,42 +127,54 @@ mod surf_client {
         }
     }
     #[async_trait]
-    impl<'a> BeatSyncApiAsync<'a, SurfError> for BeatSyncSurf {
+    impl<'a> BeatSaverApiAsync<'a, SurfError> for BeatSaverSurf {
         async fn request_raw(&'a self, url: Url) -> Result<Bytes, SurfError> {
             Ok(self.client.get(url).recv_bytes().await?.into())
         }
     }
 }
 #[cfg(feature = "surf_backend")]
-pub use surf_client::BeatSyncSurf;
-#[cfg(all(feature = "surf_backend", not(feature = "reqwest_backend"), not(feature = "ureq_backend")))]
-pub use surf_client::BeatSyncSurf as BeatSync;
+pub use surf_client::BeatSaverSurf;
+#[cfg(all(
+    feature = "surf_backend",
+    not(feature = "reqwest_backend"),
+    not(feature = "ureq_backend")
+))]
+pub use surf_client::BeatSaverSurf as BeatSaver;
 
 #[cfg(feature = "ureq_backend")]
 mod ureq_client {
-    use ureq;
-    use crate::{BeatSyncApiSync, BeatSyncApiError};
-    use url::Url;
-    use std::convert::From;
+    use crate::{BeatSaverApiError, BeatSaverApiSync};
     use bytes::Bytes;
+    use std::convert::From;
     use std::io::Read;
+    use ureq;
+    use url::Url;
 
-    impl From<ureq::Error> for BeatSyncApiError<ureq::Error> {
+    impl From<ureq::Error> for BeatSaverApiError<ureq::Error> {
         fn from(e: ureq::Error) -> Self {
             Self::RequestError(e)
         }
     }
-    
+
+    /// [BeatSaverApi][crate::BeatSaverApiSync] implemented for [ureq]
     #[derive(Debug)]
-    pub struct BeatSyncUreq {
-    }
-    impl BeatSyncUreq {
+    pub struct BeatSaverUreq {}
+    impl BeatSaverUreq {
+        /// Creates a new [BeatSaverUreq][crate::client::BeatSaverUreq] object
+        ///
+        /// Example:
+        /// ```no_run
+        /// use beatsaver_rs::client::BeatSaverUreq;
+        ///
+        /// let client = BeatSaverUreq::new();
+        /// ```
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            Self { }
+            Self {}
         }
     }
-    impl<'a> BeatSyncApiSync<'a, ureq::Error> for BeatSyncUreq {
+    impl<'a> BeatSaverApiSync<'a, ureq::Error> for BeatSaverUreq {
         fn request_raw(&'a self, url: Url) -> Result<Bytes, ureq::Error> {
             let mut contents = vec![];
             let resp = ureq::get(url.as_str()).call();
@@ -133,20 +186,24 @@ mod ureq_client {
     }
 }
 #[cfg(feature = "ureq_backend")]
-pub use ureq_client::BeatSyncUreq;
-#[cfg(all(feature = "ureq_backend", not(feature = "reqwest_backend"), not(feature = "surf_backend")))]
-pub use ureq_client::BeatSyncUreq as BeatSync;
+pub use ureq_client::BeatSaverUreq;
+#[cfg(all(
+    feature = "ureq_backend",
+    not(feature = "reqwest_backend"),
+    not(feature = "surf_backend")
+))]
+pub use ureq_client::BeatSaverUreq as BeatSaver;
 
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "surf_backend")]
     #[async_std::test]
     async fn test_surf_map() {
-        use crate::client::BeatSyncSurf;
-        use crate::BeatSyncApiAsync;
+        use crate::client::BeatSaverSurf;
+        use crate::BeatSaverApiAsync;
         use std::convert::TryInto;
 
-        let client = BeatSyncSurf::new();
+        let client = BeatSaverSurf::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 
         assert_eq!(map.key, "2144");
@@ -154,11 +211,11 @@ mod tests {
     #[cfg(feature = "reqwest_backend")]
     #[tokio::test]
     async fn test_reqwest_map() {
-        use crate::client::BeatSyncReqwest;
-        use crate::BeatSyncApiAsync;
+        use crate::client::BeatSaverReqwest;
+        use crate::BeatSaverApiAsync;
         use std::convert::TryInto;
 
-        let client = BeatSyncReqwest::new();
+        let client = BeatSaverReqwest::new();
         let map = client.map(&"2144".try_into().unwrap()).await.unwrap();
 
         assert_eq!(map.key, "2144");
@@ -166,11 +223,11 @@ mod tests {
     #[cfg(feature = "ureq_backend")]
     #[test]
     fn test_ureq_map() {
-        use crate::client::BeatSyncUreq;
-        use crate::BeatSyncApiSync;
+        use crate::client::BeatSaverUreq;
+        use crate::BeatSaverApiSync;
         use std::convert::TryInto;
 
-        let client = BeatSyncUreq::new();
+        let client = BeatSaverUreq::new();
         let map = client.map(&"2144".try_into().unwrap()).unwrap();
 
         assert_eq!(map.key, "2144");

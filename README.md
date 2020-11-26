@@ -1,7 +1,7 @@
 # beatsaver-rs
 
 [![Crates.io](https://img.shields.io/crates/v/beatsaver-rs.svg)](https://crates.io/crates/beatsaver-rs)
-[![Documentation](https://docs.rs/beatsaver-rs/badge.svg)](https://docs.rs/qwerty01/beatsaver-rs)
+[![Documentation](https://docs.rs/beatsaver-rs/badge.svg)](https://docs.rs/beatsaver-rs)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/qwerty01/beatsaver-rs)](https://github.com/qwerty01/beatsaver-rs/issues)
 [![Build](https://github.com/qwerty01/beatsaver-rs/workflows/Build/badge.svg)](https://github.com/qwerty01/beatsaver-rs/actions?query=workflow%3ABuild)
@@ -10,13 +10,39 @@ This project is a Rust library for interacting with the beatsaver.com api.
 
 ## Installation
 
-```bash
-cargo install beatsaver-rs
+Add the following to your dependencies:
+```toml
+beatsaver-rs = "0.0.2"
 ```
 
 ## Usage
 
-API has not been stabalized yet.
+```rust
+use beatsaver_rs::BeatSaverApi;
+use beatsaver_rs::client::BeatSaver;
+use beatsaver_rs::map::Map;
+use bytes::Bytes;
+use std::convert::TryInto;
+
+#[tokio::main]
+async fn main() {
+    // Create a new client
+    let client = BeatSaver::new();
+
+    // Get map with key `1`
+    let map: Map = client.map(&"1".try_into().unwrap()).await.unwrap();
+    println!("Map by key: {}", map.name);
+
+    // Get map with hash fda568fc27c20d21f8dc6f3709b49b5cc96723be
+    let map: Map = client.map(&"fda568fc27c20d21f8dc6f3709b49b5cc96723be".try_into().unwrap()).await.unwrap();
+    println!("Map by hash: {}", map.name);
+
+    // Download map
+    let map_download: Bytes = client.download((&map).into()).await.unwrap();
+    let map_download: Bytes = client.download("1".into()).await.unwrap();
+    // save map somewhere
+}
+```
 
 ## Backends
 
