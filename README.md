@@ -39,7 +39,7 @@ async fn main() {
 
     // Download map
     let map_download: Bytes = client.download((&map).into()).await.unwrap();
-    let map_download: Bytes = client.download("1".into()).await.unwrap();
+    let map_download: Bytes = client.download(&"1".try_into().unwrap()).await.unwrap();
     // save map somewhere
 }
 ```
