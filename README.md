@@ -12,7 +12,7 @@ This project is a Rust library for interacting with the beatsaver.com api.
 
 Add the following to your dependencies:
 ```toml
-beatsaver-rs = "0.1.1"
+beatsaver-rs = "0.1.2"
 ```
 
 ## Usage
