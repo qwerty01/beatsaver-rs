@@ -11,8 +11,8 @@ keywords = ["beatsaber", "beatsaver", "beastsaber", "bsaber", "api"]
 categories = ["api-bindings", "asynchronous", "web-programming"]
 
 [features]
-default = ["reqwest_backend"]
-async = ["async-trait"]
+default = ["ureq_backend"]
+async = ["async-trait", "futures"]
 sync = []
 surf_backend = ["async-std", "surf", "async"]
 reqwest_backend = ["tokio", "reqwest", "async"]
@@ -31,6 +31,7 @@ bytes = "0.5"
 surf = { version = "2.1", optional = true }
 async-std = { version = "1.7", features = ["attributes"], optional = true }
 async-trait = { version = "0.1", optional = true }
+futures = {version = "0.3.8", optional = true }
 tokio = { version = "0.2", features = ["macros"], optional = true }
 reqwest = { version = "0.10", optional = true }
 sha2 = { version = "0.9", optional = true }
