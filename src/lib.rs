@@ -32,7 +32,7 @@
 //! # }
 //! ```
 use bytes::Bytes;
-use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use hex::{self, FromHexError};
 use lazy_static::lazy_static;
 use map::Map;
@@ -173,6 +173,19 @@ pub struct BeatSaverRateLimit {
     reset_after: Duration,
 }
 
+/// Converts the body of a 429 response to a BeatSaverApiError::RateLimitError
+pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
+    let s = match String::from_utf8(data.as_ref().to_vec()) {
+        Ok(s) => s,
+        Err(e) => return e.into(),
+    };
+    let limit: BeatSaverRateLimit = match serde_json::from_str(s.as_str()) {
+        Ok(b) => b,
+        Err(e) => return e.into(),
+    };
+    BeatSaverApiError::RateLimitError(limit.reset)
+}
+
 /// Error type for parsing a Map ID
 #[derive(Debug, Clone, PartialEq)]
 pub enum MapIdError {
@@ -273,7 +286,7 @@ impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
             Self::Utf8Error(e) => e.fmt(f),
             Self::IoError(e) => e.fmt(f),
             Self::RateLimitError(e) => {
-                let now = Local::now();
+                let now = Utc::now();
                 let diff = now.signed_duration_since(e.clone());
                 write!(
                     f,
@@ -298,19 +311,6 @@ impl<T: fmt::Display> From<std::io::Error> for BeatSaverApiError<T> {
     fn from(e: std::io::Error) -> Self {
         Self::IoError(e)
     }
-}
-
-/// Converts the body of a 429 response to a BeatSaverApiError::RateLimitError
-pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
-    let s = match String::from_utf8(data.as_ref().to_vec()) {
-        Ok(s) => s,
-        Err(e) => return e.into(),
-    };
-    let limit: BeatSaverRateLimit = match serde_json::from_str(s.as_str()) {
-        Ok(b) => b,
-        Err(e) => return e.into(),
-    };
-    BeatSaverApiError::RateLimitError(limit.reset)
 }
 
 #[cfg(all(feature = "async", not(feature = "sync")))]

@@ -27,10 +27,18 @@ where
                 Some(n) => {
                     let page = f(n).await;
                     match page {
-                        Ok(p) => Ok(Some((
-                            stream::iter(p.docs.into_iter().map(Ok)),
-                            p.next_page,
-                        ))),
+                        Ok(p) => {
+                            let v = p
+                                .docs
+                                .into_iter()
+                                .map(Ok)
+                                .collect::<Vec<Result<T, BeatSaverApiError<E>>>>();
+                            Ok(Some((stream::iter(v), p.next_page)))
+                        }
+                        Err(BeatSaverApiError::RateLimitError(r)) => {
+                            let v = vec![Err(BeatSaverApiError::RateLimitError(r))];
+                            Ok(Some((stream::iter(v), Some(n))))
+                        }
                         Err(e) => Err(e),
                     }
                 }

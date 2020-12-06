@@ -11,7 +11,7 @@ keywords = ["beatsaber", "beatsaver", "beastsaber", "bsaber", "api"]
 categories = ["api-bindings", "asynchronous", "web-programming"]
 
 [features]
-default = ["ureq_backend"]
+default = ["reqwest_backend"]
 async = ["async-trait", "futures"]
 sync = []
 surf_backend = ["async-std", "surf", "async"]
