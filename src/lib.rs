@@ -31,10 +31,12 @@
 //! }
 //! # }
 //! ```
+use bytes::Bytes;
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use hex::{self, FromHexError};
 use lazy_static::lazy_static;
 use map::Map;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 use serde_json;
 use std::collections::VecDeque;
 use std::convert::{From, TryFrom, TryInto};
@@ -42,6 +44,7 @@ use std::error::Error;
 use std::fmt;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
+use std::time::Duration;
 use url::Url;
 
 mod async_api;
@@ -85,6 +88,89 @@ pub struct Page<T: Serialize> {
     /// Note: Set to `None` if you are on the last page
     #[serde(alias = "nextPage")]
     pub next_page: Option<usize>,
+}
+
+struct DateTimeVisitor;
+impl DateTimeVisitor {
+    fn from<T>(v: T) -> DateTime<Utc>
+    where
+        T: Into<i64>,
+    {
+        let ts: i64 = v.into();
+        let nts = NaiveDateTime::from_timestamp(ts / 1000, ((ts % 1000) as u32) * 1_000_000);
+        DateTime::from_utc(nts, Utc)
+    }
+}
+impl<'a> de::Visitor<'a> for DateTimeVisitor {
+    type Value = DateTime<Utc>;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a unix timestamp (including milliseconds)")
+    }
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Self::from(value as i64))
+    }
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Self::from(value))
+    }
+}
+fn from_timestamp<'a, D>(d: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: de::Deserializer<'a>,
+{
+    d.deserialize_i64(DateTimeVisitor)
+}
+
+struct DurationVisitor;
+impl DurationVisitor {
+    fn from<T>(v: T) -> Duration
+    where
+        T: Into<u64>,
+    {
+        Duration::from_millis(v.into())
+    }
+}
+impl<'a> de::Visitor<'a> for DurationVisitor {
+    type Value = Duration;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "an integer duration in milliseconds")
+    }
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Self::from(value))
+    }
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Self::from(value as u64))
+    }
+}
+fn from_duration<'a, D>(d: D) -> Result<Duration, D::Error>
+where
+    D: de::Deserializer<'a>,
+{
+    d.deserialize_u64(DurationVisitor)
+}
+
+/// Structure used for deserializing rate limit errors
+#[derive(Clone, Debug, Deserialize)]
+pub struct BeatSaverRateLimit {
+    /// DateTime when the rate limit will expire
+    #[serde(deserialize_with = "from_timestamp")]
+    reset: DateTime<Utc>,
+    /// Duration of the rate limit
+    #[serde(alias = "resetAfter", deserialize_with = "from_duration")]
+    reset_after: Duration,
 }
 
 /// Error type for parsing a Map ID
@@ -173,8 +259,10 @@ pub enum BeatSaverApiError<T: fmt::Display> {
     ArgumentError(&'static str),
     /// Conversion to a [String][std::string::String] failed
     Utf8Error(FromUtf8Error),
+    /// Error in IO
+    IoError(std::io::Error),
     /// Rate limit was hit while making the request
-    RateLimitError,
+    RateLimitError(DateTime<Utc>),
 }
 impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -183,7 +271,16 @@ impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
             Self::SerializeError(e) => e.fmt(f),
             Self::ArgumentError(a) => write!(f, "Invalid argument: {}", a),
             Self::Utf8Error(e) => e.fmt(f),
-            Self::RateLimitError => write!(f, "API rate limit hit"),
+            Self::IoError(e) => e.fmt(f),
+            Self::RateLimitError(e) => {
+                let now = Local::now();
+                let diff = now.signed_duration_since(e.clone());
+                write!(
+                    f,
+                    "API rate limit hit (retry in {} ms)",
+                    diff.num_milliseconds()
+                )
+            }
         }
     }
 }
@@ -196,6 +293,24 @@ impl<T: fmt::Display> From<FromUtf8Error> for BeatSaverApiError<T> {
     fn from(e: FromUtf8Error) -> Self {
         Self::Utf8Error(e)
     }
+}
+impl<T: fmt::Display> From<std::io::Error> for BeatSaverApiError<T> {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
+    }
+}
+
+/// Converts the body of a 429 response to a BeatSaverApiError::RateLimitError
+pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
+    let s = match String::from_utf8(data.as_ref().to_vec()) {
+        Ok(s) => s,
+        Err(e) => return e.into(),
+    };
+    let limit: BeatSaverRateLimit = match serde_json::from_str(s.as_str()) {
+        Ok(b) => b,
+        Err(e) => return e.into(),
+    };
+    BeatSaverApiError::RateLimitError(limit.reset)
 }
 
 #[cfg(all(feature = "async", not(feature = "sync")))]

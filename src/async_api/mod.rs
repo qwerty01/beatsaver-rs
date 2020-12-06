@@ -48,7 +48,9 @@ where
     BeatSaverApiError<T>: From<T>,
 {
     /// Executes a raw request to the provided [Url][url::Url]
-    async fn request_raw(&'a self, url: Url) -> Result<Bytes, T>;
+    ///
+    /// Make sure to handle 429 (pass the data to [rate_limit][crate::rate_limit])
+    async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<T>>;
     /// Executes a request and converts the result into a [String][std::string::String]
     async fn request(&'a self, url: Url) -> Result<String, BeatSaverApiError<T>> {
         let data = self.request_raw(url).await?;
@@ -356,21 +358,21 @@ where
 #[cfg(test)]
 mod tests {
     use crate::tests::{FakeClient, FakeClientPaged, FakeError};
-    use crate::BeatSaverApiAsync;
+    use crate::{BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
     use bytes::Bytes;
     use url::Url;
 
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, FakeError> for FakeClient {
-        async fn request_raw(&'a self, url: Url) -> Result<Bytes, FakeError> {
+        async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<FakeError>> {
             assert_eq!(self.url, url);
             Ok(self.data.clone())
         }
     }
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, FakeError> for FakeClientPaged {
-        async fn request_raw(&'a self, url: Url) -> Result<Bytes, FakeError> {
+        async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<FakeError>> {
             let data = self.pages.get(&url).unwrap();
             Ok(data.clone())
         }

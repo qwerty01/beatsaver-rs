@@ -53,7 +53,9 @@ where
     BeatSaverApiError<T>: From<T>,
 {
     /// Executes a raw request to the provided [Url][url::Url]
-    fn request_raw(&'a self, url: Url) -> Result<Bytes, T>;
+    ///
+    /// Make sure to handle 429 (pass the data to [rate_limit][crate::rate_limit])
+    fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<T>>;
     /// Executes a request and converts the result into a [String][std::string::String]
     fn request(&'a self, url: Url) -> Result<String, BeatSaverApiError<T>> {
         let data = self.request_raw(url)?;
@@ -409,26 +411,25 @@ where
     }
 }
 
-#[cfg(feature = "sync")]
 #[cfg(test)]
 mod tests {
     use crate::map::Map;
     use crate::tests::{FakeClient, FakeClientPaged, FakeError};
     use crate::BeatSaverApiSync;
-    use crate::{BeatSaverUser, Page, BEATSAVER_URL};
+    use crate::{BeatSaverApiError, BeatSaverUser, Page, BEATSAVER_URL};
     use bytes::Bytes;
     use std::collections::HashMap;
     use std::convert::TryInto;
     use url::Url;
 
     impl<'a> BeatSaverApiSync<'a, FakeError> for FakeClient {
-        fn request_raw(&'a self, url: Url) -> Result<Bytes, FakeError> {
+        fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<FakeError>> {
             assert_eq!(self.url, url);
             Ok(self.data.clone())
         }
     }
     impl<'a> BeatSaverApiSync<'a, FakeError> for FakeClientPaged {
-        fn request_raw(&'a self, url: Url) -> Result<Bytes, FakeError> {
+        fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<FakeError>> {
             let data = match self.pages.get(&url) {
                 Some(d) => d,
                 None => panic!("Url not found: {}", url.as_str()),
