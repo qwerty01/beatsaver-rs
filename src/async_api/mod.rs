@@ -2,7 +2,7 @@
 use crate::{BeatSaverApiError, BeatSaverUser, Map, MapId, Page, BEATSAVER_URL};
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream, Future, Stream, TryStreamExt};
+use futures::{stream, Future, Stream, StreamExt};
 use serde::Serialize;
 use std::error::Error;
 use std::pin::Pin;
@@ -22,30 +22,29 @@ where
     F: Copy,
 {
     Box::pin(
-        stream::try_unfold(Some(initial), move |num| async move {
+        stream::unfold(Some(initial), move |num| async move {
             match num {
                 Some(n) => {
                     let page = f(n).await;
                     match page {
                         Ok(p) => {
-                            let v = p
+                            let v: Vec<Result<T, BeatSaverApiError<E>>> = p
                                 .docs
                                 .into_iter()
                                 .map(Ok)
-                                .collect::<Vec<Result<T, BeatSaverApiError<E>>>>();
-                            Ok(Some((stream::iter(v), p.next_page)))
+                                .collect();
+                            Some((stream::iter(v), p.next_page))
                         }
-                        Err(BeatSaverApiError::RateLimitError(r)) => {
-                            let v = vec![Err(BeatSaverApiError::RateLimitError(r))];
-                            Ok(Some((stream::iter(v), Some(n))))
+                        Err(e) => {
+                            let v = vec![Err(e.into())];
+                            Some((stream::iter(v), Some(n)))
                         }
-                        Err(e) => Err(e),
                     }
                 }
-                None => Ok(None),
+                None => None,
             }
         })
-        .try_flatten(),
+        .flatten(),
     )
 }
 

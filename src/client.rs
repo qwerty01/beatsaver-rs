@@ -8,9 +8,13 @@
 //! * [ureq](https://crates.io/crates/ureq) => `ureq_backend` feature (synchronous)
 //!
 //! If only one backend is specified, it will be aliased to `BeatSaver`
+
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
     use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
+    use super::USER_AGENT;
     use async_trait::async_trait;
     use bytes::Bytes;
     use reqwest::Client;
@@ -35,11 +39,7 @@ mod reqwest_client {
         // TODO: Allow user to specify client
         pub fn new() -> Self {
             let client = Client::builder()
-                .user_agent(concat!(
-                    env!("CARGO_PKG_NAME"),
-                    "/",
-                    env!("CARGO_PKG_VERSION")
-                ))
+                .user_agent(USER_AGENT)
                 .build()
                 .unwrap();
             Self { client }
@@ -79,6 +79,7 @@ pub use reqwest_client::BeatSaverReqwest as BeatSaver;
 #[cfg(feature = "surf_backend")]
 mod surf_client {
     use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
+    use super::USER_AGENT;
     use async_trait::async_trait;
     use bytes::Bytes;
     use std::convert::From;
@@ -140,7 +141,7 @@ mod surf_client {
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, SurfError> for BeatSaverSurf {
         async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<SurfError>> {
-            let mut resp = self.client.get(url).await?;
+            let mut resp = self.client.get(url).header("User-Agent", USER_AGENT).await?;
             let data = resp.body_bytes().await?.into();
             match resp.status() {
                 StatusCode::TooManyRequests => Err(rate_limit(data)),
@@ -161,6 +162,7 @@ pub use surf_client::BeatSaverSurf as BeatSaver;
 #[cfg(feature = "ureq_backend")]
 mod ureq_client {
     use crate::{rate_limit, BeatSaverApiError, BeatSaverApiSync};
+    use super::USER_AGENT;
     use bytes::Bytes;
     use std::convert::From;
     use std::io::Read;
@@ -193,7 +195,7 @@ mod ureq_client {
     impl<'a> BeatSaverApiSync<'a, ureq::Error> for BeatSaverUreq {
         fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<ureq::Error>> {
             let mut contents = vec![];
-            let resp = ureq::get(url.as_str()).call();
+            let resp = ureq::get(url.as_str()).set("User-Agent", USER_AGENT).call();
             let status = resp.status();
             let mut reader = resp.into_reader();
             reader.read_to_end(&mut contents)?;
