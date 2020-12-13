@@ -28,11 +28,8 @@ where
                     let page = f(n).await;
                     match page {
                         Ok(p) => {
-                            let v: Vec<Result<T, BeatSaverApiError<E>>> = p
-                                .docs
-                                .into_iter()
-                                .map(Ok)
-                                .collect();
+                            let v: Vec<Result<T, BeatSaverApiError<E>>> =
+                                p.docs.into_iter().map(Ok).collect();
                             Some((stream::iter(v), p.next_page))
                         }
                         Err(e) => {

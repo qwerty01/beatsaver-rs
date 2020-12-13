@@ -13,8 +13,8 @@ const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VE
 
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
-    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
     use bytes::Bytes;
     use reqwest::Client;
@@ -38,10 +38,7 @@ mod reqwest_client {
         /// ```
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            let client = Client::builder()
-                .user_agent(USER_AGENT)
-                .build()
-                .unwrap();
+            let client = Client::builder().user_agent(USER_AGENT).build().unwrap();
             Self { client }
         }
     }
@@ -78,8 +75,8 @@ pub use reqwest_client::BeatSaverReqwest as BeatSaver;
 
 #[cfg(feature = "surf_backend")]
 mod surf_client {
-    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
     use bytes::Bytes;
     use std::convert::From;
@@ -141,7 +138,11 @@ mod surf_client {
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, SurfError> for BeatSaverSurf {
         async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<SurfError>> {
-            let mut resp = self.client.get(url).header("User-Agent", USER_AGENT).await?;
+            let mut resp = self
+                .client
+                .get(url)
+                .header("User-Agent", USER_AGENT)
+                .await?;
             let data = resp.body_bytes().await?.into();
             match resp.status() {
                 StatusCode::TooManyRequests => Err(rate_limit(data)),
@@ -161,8 +162,8 @@ pub use surf_client::BeatSaverSurf as BeatSaver;
 
 #[cfg(feature = "ureq_backend")]
 mod ureq_client {
-    use crate::{rate_limit, BeatSaverApiError, BeatSaverApiSync};
     use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiError, BeatSaverApiSync};
     use bytes::Bytes;
     use std::convert::From;
     use std::io::Read;
