@@ -42,6 +42,11 @@ mod reqwest_client {
             Self { client }
         }
     }
+    impl From<Client> for BeatSaverReqwest {
+        fn from(client: Client) -> Self {
+            Self { client }
+        }
+    }
     impl From<reqwest::Error> for BeatSaverApiError<reqwest::Error> {
         fn from(e: reqwest::Error) -> Self {
             Self::RequestError(e)
@@ -132,6 +137,11 @@ mod surf_client {
         // TODO: Allow user to specify client
         pub fn new() -> Self {
             let client = Client::new();
+            Self { client }
+        }
+    }
+    impl From<Client> for BeatSaverSurf {
+        fn from(client: Client) -> Self {
             Self { client }
         }
     }
