@@ -1,6 +1,6 @@
 [package]
 name = "beatsaver-rs"
-version = "0.1.2"
+version = "0.2.0"
 description = "A Rust library for interacting with the beatsaver.com api"
 documentation = "https://docs.rs/beatsaver-rs/"
 authors = ["qwerty01 <qw3rty01@gmail.com>"]
