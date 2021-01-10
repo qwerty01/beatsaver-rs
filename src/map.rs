@@ -33,7 +33,7 @@ pub struct MapDifficltyCharacteristic {
     /// TODO: What does this represent?
     pub length: usize,
     /// TODO: What does this represent?
-    pub njs: usize,
+    pub njs: f32,
     /// TODO: What does this represent?
     #[serde(alias = "njsOffset")]
     pub njs_offset: f32,
@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(normal.bombs, 4);
         assert_eq!(normal.notes, 301);
         assert_eq!(normal.obstacles, 24);
-        assert_eq!(normal.njs, 10);
+        assert_eq!(normal.njs, 10f32);
         assert_eq!(normal.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.hard.is_some());
@@ -387,7 +387,7 @@ mod tests {
         assert_eq!(hard.bombs, 4);
         assert_eq!(hard.notes, 486);
         assert_eq!(hard.obstacles, 24);
-        assert_eq!(hard.njs, 10);
+        assert_eq!(hard.njs, 10f32);
         assert_eq!(hard.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.expert.is_some());
@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(expert.bombs, 4);
         assert_eq!(expert.notes, 620);
         assert_eq!(expert.obstacles, 24);
-        assert_eq!(expert.njs, 10);
+        assert_eq!(expert.njs, 10f32);
         assert_eq!(expert.njs_offset, 0f32);
 
         assert!(characteristics.difficulties.expert_plus.is_some());
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(expert_plus.bombs, 0);
         assert_eq!(expert_plus.notes, 894);
         assert_eq!(expert_plus.obstacles, 0);
-        assert_eq!(expert_plus.njs, 12);
+        assert_eq!(expert_plus.njs, 12f32);
         assert_eq!(expert_plus.njs_offset, 0f32);
 
         assert_eq!(v.metadata.song_name, "Shut Up and Dance");

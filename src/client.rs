@@ -8,12 +8,17 @@
 //! * [ureq](https://crates.io/crates/ureq) => `ureq_backend` feature (synchronous)
 //!
 //! If only one backend is specified, it will be aliased to `BeatSaver`
+
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[cfg(feature = "reqwest_backend")]
 mod reqwest_client {
-    use crate::{BeatSaverApiAsync, BeatSaverApiError};
+    use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
     use bytes::Bytes;
     use reqwest::Client;
+    use reqwest::StatusCode;
     use std::convert::From;
     use url::Url;
 
@@ -33,14 +38,12 @@ mod reqwest_client {
         /// ```
         // TODO: Allow user to specify client
         pub fn new() -> Self {
-            let client = Client::builder()
-                .user_agent(concat!(
-                    env!("CARGO_PKG_NAME"),
-                    "/",
-                    env!("CARGO_PKG_VERSION")
-                ))
-                .build()
-                .unwrap();
+            let client = Client::builder().user_agent(USER_AGENT).build().unwrap();
+            Self { client }
+        }
+    }
+    impl From<Client> for BeatSaverReqwest {
+        fn from(client: Client) -> Self {
             Self { client }
         }
     }
@@ -51,8 +54,18 @@ mod reqwest_client {
     }
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, reqwest::Error> for BeatSaverReqwest {
-        async fn request_raw(&'a self, url: Url) -> Result<Bytes, reqwest::Error> {
-            self.client.get(url).send().await?.bytes().await
+        async fn request_raw(
+            &'a self,
+            url: Url,
+        ) -> Result<Bytes, BeatSaverApiError<reqwest::Error>> {
+            let resp = self.client.get(url).send().await?;
+            let status = resp.status();
+            let data = resp.bytes().await?;
+
+            match status {
+                StatusCode::TOO_MANY_REQUESTS => Err(rate_limit(data)),
+                _ => Ok(data),
+            }
         }
     }
 }
@@ -67,13 +80,14 @@ pub use reqwest_client::BeatSaverReqwest as BeatSaver;
 
 #[cfg(feature = "surf_backend")]
 mod surf_client {
-    use crate::{BeatSaverApiAsync, BeatSaverApiError};
+    use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
     use async_trait::async_trait;
     use bytes::Bytes;
     use std::convert::From;
     use std::error::Error;
     use std::fmt::{self, Display, Formatter};
-    use surf::Client;
+    use surf::{Client, StatusCode};
     use url::Url;
 
     /// [Error][std::error::Error] wrapper type for [surf::Error]
@@ -126,10 +140,24 @@ mod surf_client {
             Self { client }
         }
     }
+    impl From<Client> for BeatSaverSurf {
+        fn from(client: Client) -> Self {
+            Self { client }
+        }
+    }
     #[async_trait]
     impl<'a> BeatSaverApiAsync<'a, SurfError> for BeatSaverSurf {
-        async fn request_raw(&'a self, url: Url) -> Result<Bytes, SurfError> {
-            Ok(self.client.get(url).recv_bytes().await?.into())
+        async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<SurfError>> {
+            let mut resp = self
+                .client
+                .get(url)
+                .header("User-Agent", USER_AGENT)
+                .await?;
+            let data = resp.body_bytes().await?.into();
+            match resp.status() {
+                StatusCode::TooManyRequests => Err(rate_limit(data)),
+                _ => Ok(data),
+            }
         }
     }
 }
@@ -144,7 +172,8 @@ pub use surf_client::BeatSaverSurf as BeatSaver;
 
 #[cfg(feature = "ureq_backend")]
 mod ureq_client {
-    use crate::{BeatSaverApiError, BeatSaverApiSync};
+    use super::USER_AGENT;
+    use crate::{rate_limit, BeatSaverApiError, BeatSaverApiSync};
     use bytes::Bytes;
     use std::convert::From;
     use std::io::Read;
@@ -175,13 +204,28 @@ mod ureq_client {
         }
     }
     impl<'a> BeatSaverApiSync<'a, ureq::Error> for BeatSaverUreq {
-        fn request_raw(&'a self, url: Url) -> Result<Bytes, ureq::Error> {
+        fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<ureq::Error>> {
             let mut contents = vec![];
-            let resp = ureq::get(url.as_str()).call();
-            let mut reader = resp.into_reader();
-            reader.read_to_end(&mut contents)?;
-
-            Ok(contents.into())
+            match ureq::get(url.as_str()).set("User-Agent", USER_AGENT).call() {
+                Ok(resp) => {
+                    let mut reader = resp.into_reader();
+                    reader.read_to_end(&mut contents)?;
+                    Ok(contents.into())
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let mut reader = resp.into_reader();
+                    reader.read_to_end(&mut contents)?;
+                    match code {
+                        429 => Err(rate_limit(contents.into())),
+                        // TODO: req doesn't have an error type for HTTP errors, might need
+                        // to do some extra checks with the http crate in the future
+                        _ => Ok(contents.into()),
+                    }
+                }
+                Err(e) => {
+                    Err(e.into())
+                }
+            }
         }
     }
 }

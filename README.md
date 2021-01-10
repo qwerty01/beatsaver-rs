@@ -12,11 +12,12 @@ This project is a Rust library for interacting with the beatsaver.com api.
 
 Add the following to your dependencies:
 ```toml
-beatsaver-rs = "0.1.2"
+beatsaver-rs = "0.2.0"
 ```
 
 ## Usage
 
+Basic usage:
 ```rust
 use beatsaver_rs::BeatSaverApi;
 use beatsaver_rs::client::BeatSaver;
@@ -41,6 +42,40 @@ async fn main() {
     let map_download: Bytes = client.download((&map).into()).await.unwrap();
     let map_download: Bytes = client.download(&"1".try_into().unwrap()).await.unwrap();
     // save map somewhere
+}
+```
+
+Iterators:
+```rust
+use beatsaver_rs::BeatSaverApi;
+use beatsaver_rs::client::BeatSaver;
+use beatsaver_rs::map::Map;
+
+#[tokio::main]
+async fn main() {
+    // Create a new client
+    let client = BeatSaver::new();
+    
+    // Get the latest maps
+    let mut maps = client.maps_latest();
+    
+    // Iterate while there are more maps
+    while let Some(map) = maps.next().await {
+        match map {
+            // We retrieved the map
+            Ok(m) => println!(" => {}", m.name),
+            // We were rate limited, wait the specified time
+            Err(BeatSaverApiError::RateLimitError(r)) => {
+                println!("Rate Limit: {:?}", r.reset_after);
+                sleep(r.reset_after).await;
+            }
+            // Some other error, continue to try again, break to stop
+            Err(e) => {
+                println!("Error: {:?}", e),
+                break;
+            }
+        }
+    }
 }
 ```
 
