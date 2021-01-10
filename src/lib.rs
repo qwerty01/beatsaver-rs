@@ -167,10 +167,10 @@ where
 pub struct BeatSaverRateLimit {
     /// DateTime when the rate limit will expire
     #[serde(deserialize_with = "from_timestamp")]
-    reset: DateTime<Utc>,
+    pub reset: DateTime<Utc>,
     /// Duration of the rate limit
     #[serde(alias = "resetAfter", deserialize_with = "from_duration")]
-    reset_after: Duration,
+    pub reset_after: Duration,
 }
 
 /// Converts the body of a 429 response to a BeatSaverApiError::RateLimitError
@@ -183,7 +183,7 @@ pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
         Ok(b) => b,
         Err(e) => return e.into(),
     };
-    BeatSaverApiError::RateLimitError(limit.reset)
+    BeatSaverApiError::RateLimitError(limit)
 }
 
 /// Error type for parsing a Map ID
@@ -275,7 +275,7 @@ pub enum BeatSaverApiError<T: fmt::Display> {
     /// Error in IO
     IoError(std::io::Error),
     /// Rate limit was hit while making the request
-    RateLimitError(DateTime<Utc>),
+    RateLimitError(BeatSaverRateLimit),
 }
 impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -286,12 +286,10 @@ impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
             Self::Utf8Error(e) => e.fmt(f),
             Self::IoError(e) => e.fmt(f),
             Self::RateLimitError(e) => {
-                let now = Utc::now();
-                let diff = now.signed_duration_since(e.clone());
                 write!(
                     f,
                     "API rate limit hit (retry in {} ms)",
-                    diff.num_milliseconds()
+                    e.reset_after.as_millis()
                 )
             }
         }
