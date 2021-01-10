@@ -47,6 +47,10 @@ async fn main() {
 
 Iterators:
 ```rust
+use beatsaver_rs::BeatSaverApi;
+use beatsaver_rs::client::BeatSaver;
+use beatsaver_rs::map::Map;
+
 #[tokio::main]
 async fn main() {
     // Create a new client
