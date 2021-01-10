@@ -206,14 +206,25 @@ mod ureq_client {
     impl<'a> BeatSaverApiSync<'a, ureq::Error> for BeatSaverUreq {
         fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<ureq::Error>> {
             let mut contents = vec![];
-            let resp = ureq::get(url.as_str()).set("User-Agent", USER_AGENT).call();
-            let status = resp.status();
-            let mut reader = resp.into_reader();
-            reader.read_to_end(&mut contents)?;
-
-            match status {
-                429 => Err(rate_limit(contents.into())),
-                _ => Ok(contents.into()),
+            match ureq::get(url.as_str()).set("User-Agent", USER_AGENT).call() {
+                Ok(resp) => {
+                    let mut reader = resp.into_reader();
+                    reader.read_to_end(&mut contents)?;
+                    Ok(contents.into())
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let mut reader = resp.into_reader();
+                    reader.read_to_end(&mut contents)?;
+                    match code {
+                        429 => Err(rate_limit(contents.into())),
+                        // TODO: req doesn't have an error type for HTTP errors, might need
+                        // to do some extra checks with the http crate in the future
+                        _ => Ok(contents.into()),
+                    }
+                }
+                Err(e) => {
+                    Err(e.into())
+                }
             }
         }
     }
