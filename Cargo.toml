@@ -28,6 +28,7 @@ url = "2.2"
 lazy_static = "1.4"
 urlencoding = "1.1"
 bytes = "1.0"
+thiserror = "1.0.23"
 surf = { version = "2.1", optional = true }
 async-std = { version = "1.7", features = ["attributes"], optional = true }
 async-trait = { version = "0.1", optional = true }

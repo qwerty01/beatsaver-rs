@@ -13,7 +13,7 @@ impl From<ureq::Error> for BeatSaverApiError<ureq::Error> {
 }
 
 /// [BeatSaverApi][crate::BeatSaverApiSync] implemented for [ureq]
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BeatSaverUreq {}
 impl BeatSaverUreq {
     /// Creates a new [BeatSaverUreq][crate::client::BeatSaverUreq] object

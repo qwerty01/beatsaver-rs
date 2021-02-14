@@ -3,25 +3,17 @@ use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::convert::From;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use thiserror::Error;
 use surf::{Client, StatusCode};
 use url::Url;
 
 /// [Error][std::error::Error] wrapper type for [surf::Error]
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum SurfError {
     /// Surf error
+    #[error("{0:?}")]
     Error(surf::Error),
 }
-impl Display for SurfError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::Error(e) => e.fmt(f),
-        }
-    }
-}
-impl Error for SurfError {}
 impl From<surf::Error> for SurfError {
     fn from(e: surf::Error) -> Self {
         Self::Error(e)
@@ -39,7 +31,7 @@ impl From<surf::Error> for BeatSaverApiError<SurfError> {
 }
 
 /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Surf][surf]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct BeatSaverSurf {
     client: Client,
 }

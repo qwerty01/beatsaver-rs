@@ -8,7 +8,7 @@ use std::convert::From;
 use url::Url;
 
 /// [BeatSaverApi][crate::BeatSaverApiAsync] implemented for [Reqwest][reqwest]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct BeatSaverReqwest {
     client: Client,
 }

@@ -33,15 +33,17 @@
 //! ```
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use fmt::Debug;
 use hex::{self, FromHexError};
 use lazy_static::lazy_static;
+use thiserror::Error;
 use map::Map;
 use serde::{de, Deserialize, Serialize};
 use serde_json;
-use std::collections::VecDeque;
+use std::{cmp::Ordering, collections::VecDeque, hash::{Hash, Hasher}};
 use std::convert::{From, TryFrom, TryInto};
-use std::error::Error;
-use std::fmt;
+use std::error::Error as StdError;
+use std::fmt::{self, Display, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::time::Duration;
@@ -58,7 +60,7 @@ lazy_static! {
 }
 
 /// Holds data for a beatsaver user
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BeatSaverUser {
     /// User ID (e.g. `5fbe7cd60192c700062b2a1f`)
     #[serde(alias = "_id")]
@@ -66,10 +68,26 @@ pub struct BeatSaverUser {
     /// User name (e.g. `qwerty01`)
     pub username: String,
 }
+impl PartialEq for BeatSaverUser {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl Eq for BeatSaverUser {}
+impl Hash for BeatSaverUser {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+impl Display for BeatSaverUser {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        self.username.fmt(f)
+    }
+}
 
 /// Page metadata for APIs that paginate results
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Page<T: Serialize> {
+#[derive(Clone, Hash, Debug, Default, Serialize, Deserialize)]
+pub struct Page<T> {
     /// List of documents in the page
     pub docs: VecDeque<T>,
     /// Total number of documents
@@ -89,6 +107,30 @@ pub struct Page<T: Serialize> {
     #[serde(alias = "nextPage")]
     pub next_page: Option<usize>,
 }
+impl<T> PartialOrd for Page<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T> Ord for Page<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.prev_page.is_none() && other.prev_page.is_none() {
+            Ordering::Equal
+        } else if self.prev_page.is_none() && other.prev_page.is_some() {
+            Ordering::Less
+        } else if other.prev_page.is_some() && other.prev_page.is_none() {
+            Ordering::Greater
+        } else {
+            self.prev_page.unwrap().cmp(&other.prev_page.unwrap())
+        }
+    }
+}
+impl<T> PartialEq for Page<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.prev_page == other.prev_page
+    }
+}
+impl<T> Eq for Page<T> { }
 
 struct DateTimeVisitor;
 impl DateTimeVisitor {
@@ -163,7 +205,7 @@ where
 }
 
 /// Structure used for deserializing rate limit errors
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize)]
 pub struct BeatSaverRateLimit {
     /// DateTime when the rate limit will expire
     #[serde(deserialize_with = "from_timestamp")]
@@ -172,9 +214,35 @@ pub struct BeatSaverRateLimit {
     #[serde(alias = "resetAfter", deserialize_with = "from_duration")]
     pub reset_after: Duration,
 }
+impl PartialEq for BeatSaverRateLimit {
+    fn eq(&self, other: &Self) -> bool {
+        self.reset == other.reset
+    }
+}
+impl Eq for BeatSaverRateLimit {}
+impl PartialOrd for BeatSaverRateLimit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for BeatSaverRateLimit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.reset.cmp(&other.reset)
+    }
+}
+impl Hash for BeatSaverRateLimit {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.reset.hash(state);
+    }
+}
+impl Display for BeatSaverRateLimit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Rate limited, expiring {}", self.reset)
+    }
+}
 
 /// Converts the body of a 429 response to a BeatSaverApiError::RateLimitError
-pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
+pub fn rate_limit<T: StdError>(data: Bytes) -> BeatSaverApiError<T> {
     let s = match String::from_utf8(data.as_ref().to_vec()) {
         Ok(s) => s,
         Err(e) => return e.into(),
@@ -187,34 +255,22 @@ pub fn rate_limit<T: Error>(data: Bytes) -> BeatSaverApiError<T> {
 }
 
 /// Error type for parsing a Map ID
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum MapIdError {
     /// Error returned when the provided hash is invalid
     ///
     /// This can occur in the following conditions:
     /// * The length of the hash is not 24
     /// * The hash contains non-hex characters
+    #[error("specified hash is invalid")]
     InvalidHash,
     /// Error returned if the provided key is invalid
     ///
     /// This can occur in the following conditions:
     /// * Key is larger than a [usize][std::usize]
     /// * Key contains non-hex characters
-    ParseIntError(ParseIntError),
-}
-impl fmt::Display for MapIdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::InvalidHash => write!(f, "Specified hash is invalid"),
-            Self::ParseIntError(e) => e.fmt(f),
-        }
-    }
-}
-impl Error for MapIdError {}
-impl From<ParseIntError> for MapIdError {
-    fn from(e: ParseIntError) -> Self {
-        Self::ParseIntError(e)
-    }
+    #[error("{0}")]
+    ParseIntError(#[from] ParseIntError),
 }
 impl From<FromHexError> for MapIdError {
     fn from(_: FromHexError) -> Self {
@@ -223,12 +279,20 @@ impl From<FromHexError> for MapIdError {
 }
 
 /// Specifier used to index a map
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MapId {
     /// Identifier is a map key (e.g. `1`)
     Key(usize),
     /// Identifier is a map hash (e.g. `fda568fc27c20d21f8dc6f3709b49b5cc96723be`)
     Hash(String),
+}
+impl Display for MapId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Key(key) => write!(f, "map key {}", key),
+            Self::Hash(hash) => write!(f, "map hash {}", hash),
+        }
+    }
 }
 impl TryFrom<String> for MapId {
     type Error = MapIdError;
@@ -250,65 +314,38 @@ impl TryFrom<&str> for MapId {
         s.to_string().try_into()
     }
 }
-impl Into<MapId> for Map {
-    fn into(self) -> MapId {
-        MapId::Hash(self.hash)
+impl From<Map> for MapId {
+    fn from(m: Map) -> Self {
+        MapId::Hash(m.hash)
     }
 }
-impl Into<MapId> for &Map {
-    fn into(self) -> MapId {
-        MapId::Hash(self.hash.clone())
+impl From<&Map> for MapId {
+    fn from(m: &Map) -> MapId {
+        MapId::Hash(m.hash.clone())
     }
 }
 
 /// Error that could occur when querying the API
-#[derive(Debug)]
-pub enum BeatSaverApiError<T: fmt::Display> {
+#[derive(Debug, Error)]
+pub enum BeatSaverApiError<T: Debug + fmt::Display> {
     /// Error originated from the request backend
+    #[error("{0}")]
     RequestError(T),
     /// Error originated from deserializing the api response
-    SerializeError(serde_json::Error),
+    #[error("{0}")]
+    SerializeError(#[from] serde_json::Error),
     /// Argument provided is invalid
+    #[error("Inalid argument: {0}")]
     ArgumentError(&'static str),
     /// Conversion to a [String][std::string::String] failed
-    Utf8Error(FromUtf8Error),
+    #[error("{0}")]
+    Utf8Error(#[from] FromUtf8Error),
     /// Error in IO
-    IoError(std::io::Error),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
     /// Rate limit was hit while making the request
+    #[error("API rate limit it (retry in {} ms)", .0.reset_after.as_millis())]
     RateLimitError(BeatSaverRateLimit),
-}
-impl<T: fmt::Display> fmt::Display for BeatSaverApiError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::RequestError(e) => <T as fmt::Display>::fmt(e, f),
-            Self::SerializeError(e) => e.fmt(f),
-            Self::ArgumentError(a) => write!(f, "Invalid argument: {}", a),
-            Self::Utf8Error(e) => e.fmt(f),
-            Self::IoError(e) => e.fmt(f),
-            Self::RateLimitError(e) => {
-                write!(
-                    f,
-                    "API rate limit hit (retry in {} ms)",
-                    e.reset_after.as_millis()
-                )
-            }
-        }
-    }
-}
-impl<T: fmt::Display> From<serde_json::Error> for BeatSaverApiError<T> {
-    fn from(e: serde_json::Error) -> Self {
-        Self::SerializeError(e)
-    }
-}
-impl<T: fmt::Display> From<FromUtf8Error> for BeatSaverApiError<T> {
-    fn from(e: FromUtf8Error) -> Self {
-        Self::Utf8Error(e)
-    }
-}
-impl<T: fmt::Display> From<std::io::Error> for BeatSaverApiError<T> {
-    fn from(e: std::io::Error) -> Self {
-        Self::IoError(e)
-    }
 }
 
 #[cfg(all(feature = "async", not(feature = "sync")))]
