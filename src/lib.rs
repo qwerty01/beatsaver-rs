@@ -81,7 +81,7 @@ impl Hash for BeatSaverUser {
 }
 impl Display for BeatSaverUser {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.username.fmt(f)
+        fmt::Display::fmt(&self.username, f)
     }
 }
 

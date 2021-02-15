@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// This structure specifies whether or not a difficulty exists in the map
 ///
 /// Note: `false` here corresponds with `None` in [MapDifficultyCharacteristics][crate::map::MapDifficultyCharacteristics]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct MapDifficulties {
     /// `true` if easy map is available
     pub easy: bool,
@@ -26,7 +26,7 @@ pub struct MapDifficulties {
 }
 
 /// Characteristics of a map difficulty level
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct MapDifficltyCharacteristic {
     /// Duration of the difficulty beatmap
     pub duration: f32,
