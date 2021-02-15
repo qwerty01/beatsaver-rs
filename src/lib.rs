@@ -36,17 +36,21 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use fmt::Debug;
 use hex::{self, FromHexError};
 use lazy_static::lazy_static;
-use thiserror::Error;
 use map::Map;
 use serde::{de, Deserialize, Serialize};
 use serde_json;
-use std::{cmp::Ordering, collections::VecDeque, hash::{Hash, Hasher}};
 use std::convert::{From, TryFrom, TryInto};
 use std::error::Error as StdError;
 use std::fmt::{self, Display, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::time::Duration;
+use std::{
+    cmp::Ordering,
+    collections::VecDeque,
+    hash::{Hash, Hasher},
+};
+use thiserror::Error;
 use url::Url;
 
 mod async_api;
@@ -130,7 +134,7 @@ impl<T> PartialEq for Page<T> {
         self.prev_page == other.prev_page
     }
 }
-impl<T> Eq for Page<T> { }
+impl<T> Eq for Page<T> {}
 
 struct DateTimeVisitor;
 impl DateTimeVisitor {

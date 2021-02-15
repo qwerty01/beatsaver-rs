@@ -39,10 +39,7 @@ impl From<reqwest::Error> for BeatSaverApiError<reqwest::Error> {
 }
 #[async_trait]
 impl<'a> BeatSaverApiAsync<'a, reqwest::Error> for BeatSaverReqwest {
-    async fn request_raw(
-        &'a self,
-        url: Url,
-    ) -> Result<Bytes, BeatSaverApiError<reqwest::Error>> {
+    async fn request_raw(&'a self, url: Url) -> Result<Bytes, BeatSaverApiError<reqwest::Error>> {
         let resp = self.client.get(url).send().await?;
         let status = resp.status();
         let data = resp.bytes().await?;

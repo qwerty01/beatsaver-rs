@@ -3,8 +3,8 @@ use crate::{rate_limit, BeatSaverApiAsync, BeatSaverApiError};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::convert::From;
-use thiserror::Error;
 use surf::{Client, StatusCode};
+use thiserror::Error;
 use url::Url;
 
 /// [Error][std::error::Error] wrapper type for [surf::Error]

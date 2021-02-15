@@ -48,9 +48,7 @@ impl<'a> BeatSaverApiSync<'a, ureq::Error> for BeatSaverUreq {
                     _ => Ok(contents.into()),
                 }
             }
-            Err(e) => {
-                Err(e.into())
-            }
+            Err(e) => Err(e.into()),
         }
     }
 }

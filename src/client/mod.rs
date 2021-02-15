@@ -43,5 +43,3 @@ pub use ureq_client::BeatSaverUreq;
     not(feature = "surf_backend")
 ))]
 pub use ureq_client::BeatSaverUreq as BeatSaver;
-
-
