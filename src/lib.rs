@@ -50,6 +50,7 @@ use url::Url;
 mod async_api;
 pub mod client;
 pub mod map;
+pub mod model;
 mod sync_api;
 
 lazy_static! {
